@@ -49,6 +49,7 @@ crate-type = ["lib"]
 
 [features]
 default = ["curv/rust-gmp-kzen"]
+num-bigint = ["curv/num-bigint"]
 # Internally used feature for testing purposes. You normally don't want to use it.
 dev = []
 
