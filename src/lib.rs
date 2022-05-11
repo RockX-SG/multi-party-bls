@@ -13,7 +13,7 @@
 //! ### Keygen
 //! ```no_run
 //! use round_based::{Msg, AsyncProtocol};
-//! use bls::threshold_bls::state_machine::keygen::{Keygen, ProtocolMessage};
+//! use bls_eth::threshold_bls::state_machine::keygen::{Keygen, ProtocolMessage};
 //!
 //! # use std::convert::Infallible;
 //! # use anyhow::{Result, Error};
@@ -53,8 +53,8 @@
 //! ### Sign
 //! ```no_run
 //! use round_based::{Msg, AsyncProtocol};
-//! # use bls::threshold_bls::state_machine::keygen::LocalKey;
-//! use bls::threshold_bls::state_machine::sign::{Sign, ProtocolMessage};
+//! # use bls_eth::threshold_bls::state_machine::keygen::LocalKey;
+//! use bls_eth::threshold_bls::state_machine::sign::{Sign, ProtocolMessage};
 //!
 //! # use std::convert::Infallible;
 //! # use anyhow::{Result, Error};

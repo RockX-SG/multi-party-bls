@@ -85,7 +85,7 @@ async fn keygen(
         )
     }
 
-    let keygen = bls::threshold_bls::state_machine::keygen::Keygen::new(i, t, n)
+    let keygen = bls_eth::threshold_bls::state_machine::keygen::Keygen::new(i, t, n)
         .context("construct keygen initial state")?;
     info!("Start keygen");
     let output = round_based::AsyncProtocol::new(keygen, incoming, outcoming)
@@ -135,7 +135,7 @@ async fn sign(
         )
     }
 
-    let signing = bls::threshold_bls::state_machine::sign::Sign::new(digest, i, n, secret)
+    let signing = bls_eth::threshold_bls::state_machine::sign::Sign::new(digest, i, n, secret)
         .context("construct signing initial state")?;
 
     info!("Start signing");
@@ -160,7 +160,7 @@ fn verify(
     use curv::elliptic::curves::bls12_381::{g1::GE as GE1, g2::GE as GE2};
     use curv::elliptic::curves::traits::ECPoint;
 
-    use bls::basic_bls::BLSSignature;
+    use bls_eth::basic_bls::BLSSignature;
 
     let public_key =
         hex::decode(public_key).context("public key is not valid hex encoded string")?;
