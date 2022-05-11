@@ -1,5 +1,5 @@
 [package]
-name = "bls"
+name = "bls-eth"
 version = "0.1.4"
 authors = ["Doron <doronz@zengo.com>", "Omer <omer@zengo.com>", "Denis <dsurv@yandex.ru>"]
 description = "threshold BLS library"
