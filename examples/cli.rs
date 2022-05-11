@@ -172,7 +172,7 @@ fn verify(
     let public_key = GE2::from_bytes(&public_key)
         .map_err(|e| anyhow!("public key is not valid g2 point: {:?}", e))?;
 
-    let valid = BLSSignature { sigma: signature }.verify(&digest, &public_key);
+    let valid = BLSSignature { sigma: public_key }.verify(&digest, &signature);
     if valid {
         println!("Signature is valid");
     } else {

@@ -1,4 +1,4 @@
-use curv::elliptic::curves::bls12_381::g1::GE as GE1;
+use curv::elliptic::curves::bls12_381::g2::GE as GE2;
 use round_based::containers::push::Push;
 use round_based::containers::{self, BroadcastMsgs, Store};
 use round_based::Msg;
@@ -40,7 +40,7 @@ impl Round0 {
 
 pub struct Round1 {
     key: LocalKey,
-    message: GE1,
+    message: GE2,
 
     partial_sig: party_i::PartialSignature,
 }
@@ -49,7 +49,7 @@ impl Round1 {
     pub fn proceed(
         self,
         input: BroadcastMsgs<(u16, party_i::PartialSignature)>,
-    ) -> Result<(GE1, BLSSignature)> {
+    ) -> Result<(GE2, BLSSignature)> {
         let (indexes, sigs): (Vec<_>, Vec<_>) = input
             .into_vec_including_me((self.key.i, self.partial_sig))
             .into_iter()

@@ -15,13 +15,13 @@ use crate::basic_bls::BLSSignature;
 /// protocol 3.1 (MSP): pairing-based multi-signature with public-key aggregation
 #[derive(Copy, PartialEq, Clone, Debug)]
 pub struct Keys {
-    pub sk_i: FE2,
-    pub pk_i: GE2,
+    pub sk_i: FE1,
+    pub pk_i: GE1,
     pub party_index: usize,
 }
 
-pub type APK = GE2;
-pub type SIG = GE1;
+pub type APK = GE1;
+pub type SIG = GE2;
 
 impl Keys {
     pub fn new(index: usize) -> Self {
@@ -35,19 +35,19 @@ impl Keys {
         }
     }
 
-    pub fn aggregate(pk_vec: &[GE2]) -> APK {
-        let apk_plus_g = pk_vec.iter().fold(GE2::generator(), |acc, x| {
+    pub fn aggregate(pk_vec: &[GE1]) -> APK {
+        let apk_plus_g = pk_vec.iter().fold(GE1::generator(), |acc, x| {
             let i = pk_vec.iter().position(|y| y == x).unwrap();
             acc + (pk_vec[i] * &ECScalar::from(&h1(i, pk_vec)))
         });
-        apk_plus_g.sub_point(&GE2::generator().get_element())
+        apk_plus_g.sub_point(&GE1::generator().get_element())
     }
 
-    pub fn local_sign(&self, message: &[u8], pk_vec: &[GE2]) -> SIG {
+    pub fn local_sign(&self, message: &[u8], pk_vec: &[GE1]) -> SIG {
         let a_i = h1(self.party_index.clone(), pk_vec);
-        let exp = BigInt::mod_mul(&a_i, &self.sk_i.to_big_int(), &FE1::q());
-        let exp_fe1: FE1 = ECScalar::from(&exp);
-        let h_0_m = GE1::hash_to_curve(message);
+        let exp = BigInt::mod_mul(&a_i, &self.sk_i.to_big_int(), &FE2::q());
+        let exp_fe1: FE2 = ECScalar::from(&exp);
+        let h_0_m = GE2::hash_to_curve(message);
         h_0_m * exp_fe1
     }
 
@@ -70,14 +70,14 @@ impl Keys {
 
     fn core_aggregate_verify(apk_vec: &[APK], msg_vec: &[&[u8]], sig: &BLSSignature) -> bool {
         assert!(apk_vec.len() >= 1);
-        let product_c2 = Pair::compute_pairing(&sig.sigma, &GE2::generator());
-        let vec_g1: Vec<GE1> = msg_vec.iter().map(|&x| GE1::hash_to_curve(&x)).collect();
+        let product_c2 = Pair::compute_pairing(&GE1::generator(), &sig.sigma);
+        let vec_g1: Vec<GE2> = msg_vec.iter().map(|&x| GE2::hash_to_curve(&x)).collect();
         let vec: Vec<_> = vec_g1.iter().zip(apk_vec.iter()).collect();
         let (head, tail) = vec.split_at(1);
         let product_c1 = tail
             .iter()
-            .fold(Pair::compute_pairing(head[0].0, head[0].1), |acc, x| {
-                acc.add_pair(&Pair::compute_pairing(x.0, x.1))
+            .fold(Pair::compute_pairing(head[0].1, head[0].0), |acc, x| {
+                acc.add_pair(&Pair::compute_pairing(x.1, x.0))
             });
         product_c1.e == product_c2.e
     }

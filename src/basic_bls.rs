@@ -8,26 +8,26 @@ use curv::elliptic::curves::bls12_381::Pair;
 use curv::elliptic::curves::traits::{ECPoint, ECScalar};
 
 use ff_zeroize::Field;
-use pairing_plus::bls12_381::{Fq12, G1Affine};
+use pairing_plus::bls12_381::{Fq12, G1Affine, G2Affine};
 use pairing_plus::serdes::SerDes;
 
 /// Based on https://eprint.iacr.org/2018/483.pdf
 
 #[derive(Clone, Copy, Debug)]
 pub struct KeyPairG2 {
-    Y: GE2,
-    x: FE2,
+    Y: GE1,
+    x: FE1,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BLSSignature {
-    pub sigma: GE1,
+    pub sigma: GE2,
 }
 
 impl KeyPairG2 {
     pub fn new() -> Self {
-        let x: FE2 = ECScalar::new_random();
-        let Y = GE2::generator() * &x;
+        let x: FE1 = ECScalar::new_random();
+        let Y = GE1::generator() * &x;
         KeyPairG2 { x, Y }
     }
 }
@@ -35,23 +35,23 @@ impl KeyPairG2 {
 impl BLSSignature {
     // compute sigma  = x H(m)
     pub fn sign(message: &[u8], keys: &KeyPairG2) -> Self {
-        let H_m = GE1::hash_to_curve(message);
-        let fe1_x: FE1 = ECScalar::from(&ECScalar::to_big_int(&keys.x));
+        let H_m = GE2::hash_to_curve(message);
+        let fe1_x: FE2 = ECScalar::from(&ECScalar::to_big_int(&keys.x));
         BLSSignature {
             sigma: H_m * &fe1_x,
         }
     }
 
     // check e(H(m), Y) == e(sigma, g2)
-    pub fn verify(&self, message: &[u8], pubkey: &GE2) -> bool {
-        let H_m = GE1::hash_to_curve(message);
-        let product = Pair::efficient_pairing_mul(&H_m, pubkey, &self.sigma, &(-GE2::generator()));
+    pub fn verify(&self, message: &[u8], pubkey: &GE1) -> bool {
+        let H_m = GE2::hash_to_curve(message);
+        let product = Pair::efficient_pairing_mul( pubkey,&H_m,  &(-GE1::generator()), &self.sigma);
         product.e == Fq12::one()
     }
 
     pub fn to_bytes(&self, compressed: bool) -> Vec<u8> {
         let mut pk = vec![];
-        G1Affine::serialize(&self.sigma.get_element(), &mut pk, compressed)
+        G2Affine::serialize( &self.sigma.get_element(),&mut pk, compressed)
             .expect("serialize to vec should always succeed");
         pk
     }

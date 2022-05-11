@@ -21,17 +21,17 @@ use zeroize::Zeroize;
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct ECDDHProof {
-    pub a1: GE1,
-    pub a2: GE2,
+    pub a1: GE2,
+    pub a2: GE1,
     pub z: BigInt,
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct ECDDHStatement {
-    pub g1: GE1,
-    pub h1: GE1,
-    pub g2: GE2,
-    pub h2: GE2,
+    pub g1: GE2,
+    pub h1: GE2,
+    pub g2: GE1,
+    pub h2: GE1,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -41,10 +41,10 @@ pub struct ECDDHWitness {
 
 impl ECDDHProof {
     pub fn prove(w: &ECDDHWitness, delta: &ECDDHStatement) -> ECDDHProof {
-        let mut s1 = FE1::new_random();
+        let mut s1 = FE2::new_random();
         let a1 = &delta.g1 * &s1;
         let s = s1.to_big_int();
-        let mut s2: FE2 = ECScalar::from(&s);
+        let mut s2: FE1 = ECScalar::from(&s);
         let a2 = &delta.g2 * &s2;
         let e = HSha256::create_hash(&[
             &delta.g1.bytes_compressed_to_big_int(),
@@ -81,13 +81,13 @@ impl ECDDHProof {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use curv::elliptic::curves::bls12_381::g1::FE as FE1;
+    use curv::elliptic::curves::bls12_381::g1::FE as FE2;
     use curv::elliptic::curves::traits::{ECPoint, ECScalar};
     use curv::arithmetic::traits::*;
 
     #[test]
     fn test_ecddh_proof() {
-        let x = FE1::new_random().to_big_int();
+        let x = FE2::new_random().to_big_int();
         let g1 = ECPoint::generator();
         let g2 = ECPoint::base_point2();
         let h1 = &g1 * &ECScalar::from(&x);
@@ -102,7 +102,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_bad_ecddh_proof() {
-        let x = FE1::new_random().to_big_int();
+        let x = FE2::new_random().to_big_int();
         let g1 = ECPoint::generator();
         let g2 = ECPoint::base_point2();
         let h1 = &g1 * &ECScalar::from(&x);

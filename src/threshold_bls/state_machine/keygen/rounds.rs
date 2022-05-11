@@ -2,8 +2,8 @@ use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::{
     ShamirSecretSharing, VerifiableSS,
 };
-use curv::elliptic::curves::bls12_381::g2::FE as FE2;
-use curv::elliptic::curves::bls12_381::g2::GE as GE2;
+use curv::elliptic::curves::bls12_381::g1::FE as FE1;
+use curv::elliptic::curves::bls12_381::g1::GE as GE1;
 use round_based::containers::push::Push;
 use round_based::containers::{self, BroadcastMsgs, P2PMsgs, Store};
 use round_based::Msg;
@@ -103,7 +103,7 @@ impl Round2 {
         mut output: O,
     ) -> Result<Round3>
     where
-        O: Push<Msg<(VerifiableSS<GE2>, FE2)>>,
+        O: Push<Msg<(VerifiableSS<GE1>, FE1)>>,
     {
         let params = ShamirSecretSharing {
             threshold: self.t.into(),
@@ -151,11 +151,11 @@ impl Round2 {
 pub struct Round3 {
     keys: party_i::Keys,
 
-    y_vec: Vec<GE2>,
+    y_vec: Vec<GE1>,
 
     index: usize,
-    own_vss: VerifiableSS<GE2>,
-    own_share: FE2,
+    own_vss: VerifiableSS<GE1>,
+    own_share: FE1,
 
     party_i: u16,
     t: u16,
@@ -165,11 +165,11 @@ pub struct Round3 {
 impl Round3 {
     pub fn proceed<O>(
         self,
-        input: P2PMsgs<(VerifiableSS<GE2>, FE2)>,
+        input: P2PMsgs<(VerifiableSS<GE1>, FE1)>,
         mut output: O,
     ) -> Result<Round4>
     where
-        O: Push<Msg<DLogProof<GE2>>>,
+        O: Push<Msg<DLogProof<GE1>>>,
     {
         let params = ShamirSecretSharing {
             threshold: self.t.into(),
@@ -209,14 +209,14 @@ impl Round3 {
     pub fn is_expensive(&self) -> bool {
         true
     }
-    pub fn expects_messages(i: u16, n: u16) -> Store<P2PMsgs<(VerifiableSS<GE2>, FE2)>> {
+    pub fn expects_messages(i: u16, n: u16) -> Store<P2PMsgs<(VerifiableSS<GE1>, FE1)>> {
         containers::P2PMsgsStore::new(i, n)
     }
 }
 
 pub struct Round4 {
     shared_keys: party_i::SharedKeys,
-    own_dlog_proof: DLogProof<GE2>,
+    own_dlog_proof: DLogProof<GE1>,
 
     party_i: u16,
     t: u16,
@@ -224,7 +224,7 @@ pub struct Round4 {
 }
 
 impl Round4 {
-    pub fn proceed(self, input: BroadcastMsgs<DLogProof<GE2>>) -> Result<LocalKey> {
+    pub fn proceed(self, input: BroadcastMsgs<DLogProof<GE1>>) -> Result<LocalKey> {
         let params = ShamirSecretSharing {
             threshold: self.t.into(),
             share_count: self.n.into(),
@@ -245,7 +245,7 @@ impl Round4 {
     pub fn is_expensive(&self) -> bool {
         true
     }
-    pub fn expects_messages(i: u16, n: u16) -> Store<BroadcastMsgs<DLogProof<GE2>>> {
+    pub fn expects_messages(i: u16, n: u16) -> Store<BroadcastMsgs<DLogProof<GE1>>> {
         containers::BroadcastMsgsStore::new(i, n)
     }
 }
@@ -254,7 +254,7 @@ impl Round4 {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct LocalKey {
     pub(in crate::threshold_bls::state_machine) shared_keys: party_i::SharedKeys,
-    pub(in crate::threshold_bls::state_machine) vk_vec: Vec<GE2>,
+    pub(in crate::threshold_bls::state_machine) vk_vec: Vec<GE1>,
 
     pub(in crate::threshold_bls::state_machine) i: u16,
     pub(in crate::threshold_bls::state_machine) t: u16,
@@ -263,7 +263,7 @@ pub struct LocalKey {
 
 impl LocalKey {
     /// Public key of secret shared between parties
-    pub fn public_key(&self) -> GE2 {
+    pub fn public_key(&self) -> GE1 {
         self.shared_keys.vk
     }
 }

@@ -4,7 +4,7 @@ use std::fmt;
 use std::mem::replace;
 use std::time::Duration;
 
-use curv::elliptic::curves::bls12_381::g1::GE as GE1;
+use curv::elliptic::curves::bls12_381::g2::GE as GE2;
 use round_based::containers::{
     push::{Push, PushExt},
     *,
@@ -23,7 +23,7 @@ use rounds::{Round0, Round1};
 
 /// Signing protocol state machine
 ///
-/// Successfully completed keygen protocol produces [GE1] representing a message on g1 curve and
+/// Successfully completed keygen protocol produces [GE2] representing a message on g2 curve and
 /// [BLSSignature]
 pub struct Sign {
     round: R,
@@ -138,7 +138,7 @@ impl Sign {
 impl StateMachine for Sign {
     type MessageBody = ProtocolMessage;
     type Err = Error;
-    type Output = (GE1, BLSSignature);
+    type Output = (GE2, BLSSignature);
 
     fn handle_incoming(&mut self, msg: Msg<Self::MessageBody>) -> Result<()> {
         let current_round = self.current_round();
@@ -319,7 +319,7 @@ impl fmt::Debug for Sign {
 enum R {
     Round0(Round0),
     Round1(Round1),
-    Final((GE1, BLSSignature)),
+    Final((GE2, BLSSignature)),
     Gone,
 }
 

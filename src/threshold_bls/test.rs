@@ -2,7 +2,7 @@ use crate::basic_bls::BLSSignature;
 use crate::threshold_bls::party_i::Keys;
 use crate::threshold_bls::party_i::SharedKeys;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
-use curv::elliptic::curves::bls12_381::g2::FE;
+use curv::elliptic::curves::bls12_381::g1::FE;
 use curv::elliptic::curves::bls12_381::{g1::GE as GE1, g2::GE as GE2};
 use curv::elliptic::curves::traits::{ECPoint, ECScalar};
 use pairing_plus::CurveProjective;
@@ -49,7 +49,7 @@ fn test_sign_n8_t4_tprime6() {
     sign(&message[..], 4, 8, &signatories[..], None);
 }
 
-pub fn keygen_t_n_parties(t: usize, n: usize) -> (Vec<SharedKeys>, Vec<GE2>) {
+pub fn keygen_t_n_parties(t: usize, n: usize) -> (Vec<SharedKeys>, Vec<GE1>) {
     let parames = ShamirSecretSharing {
         threshold: t,
         share_count: n,
@@ -61,7 +61,7 @@ pub fn keygen_t_n_parties(t: usize, n: usize) -> (Vec<SharedKeys>, Vec<GE2>) {
     let (bc1_vec, decom_vec): (Vec<_>, Vec<_>) =
         party_keys_vec.iter().map(|k| k.phase1_broadcast()).unzip();
 
-    let y_vec = (0..n).map(|i| decom_vec[i].y_i).collect::<Vec<GE2>>();
+    let y_vec = (0..n).map(|i| decom_vec[i].y_i).collect::<Vec<GE1>>();
 
     let mut vss_scheme_vec = Vec::new();
     let mut secret_shares_vec = Vec::new();
@@ -108,7 +108,7 @@ pub fn keygen_t_n_parties(t: usize, n: usize) -> (Vec<SharedKeys>, Vec<GE2>) {
         dlog_proof_vec.push(dlog_proof);
     }
 
-    let vk_vec = (0..n).map(|i| dlog_proof_vec[i].pk).collect::<Vec<GE2>>();
+    let vk_vec = (0..n).map(|i| dlog_proof_vec[i].pk).collect::<Vec<GE1>>();
 
     //all parties run:
     Keys::verify_dlog_proofs(&parames, &dlog_proof_vec).expect("");
@@ -131,7 +131,7 @@ pub fn sign(
     t: usize,
     n: usize,
     s: &[usize],
-    keygen: Option<(Vec<SharedKeys>, Vec<GE2>)>,
+    keygen: Option<(Vec<SharedKeys>, Vec<GE1>)>,
 ) -> BLSSignature {
     // run keygen
     let (shared_keys_vec, vk_vec) = keygen.unwrap_or_else(|| keygen_t_n_parties(t, n));
@@ -143,7 +143,7 @@ pub fn sign(
         .collect::<Vec<SharedKeys>>();
     let vk_participating_parties = (0..t_prime as usize)
         .map(|i| vk_vec[s[i]].clone())
-        .collect::<Vec<GE2>>();
+        .collect::<Vec<GE1>>();
 
     // each party performs a partial sign
     let (partial_sign_vec, H_x): (Vec<_>, Vec<_>) = shared_keys_participating_parties
@@ -180,7 +180,7 @@ fn another_bls_impl_validates_signature() {
     use std::io::Cursor;
 
     use bls_sigs_ref::BLSSigCore;
-    use pairing_plus::bls12_381::{G2Affine, G1, G2};
+    use pairing_plus::bls12_381::{G1Affine, G1, G2};
     use pairing_plus::hash_to_field::ExpandMsgXmd;
     use pairing_plus::serdes::SerDes;
 
@@ -188,7 +188,7 @@ fn another_bls_impl_validates_signature() {
     let keygen = keygen_t_n_parties(1, 2);
     let public_key = keygen.0[0].vk.clone();
     let mut public_key_bytes = vec![];
-    G2Affine::serialize(&public_key.get_element(), &mut public_key_bytes, true)
+    G1Affine::serialize(&public_key.get_element(), &mut public_key_bytes, true)
         .expect("serialize to vec should always succeed");
 
     // Sign message
@@ -197,9 +197,9 @@ fn another_bls_impl_validates_signature() {
 
     // Parse public key & signature
     let public_key =
-        G2::deserialize(&mut Cursor::new(public_key_bytes), true).expect("deserialize public key");
+        G1::deserialize(&mut Cursor::new(public_key_bytes), true).expect("deserialize public key");
     let signature =
-        G1::deserialize(&mut Cursor::new(signature), true).expect("deserialize signature");
+        G2::deserialize(&mut Cursor::new(signature), true).expect("deserialize signature");
 
     // Verify signature
     let cs = &[1u8];
@@ -212,16 +212,16 @@ fn another_bls_impl_validates_signature() {
 #[test]
 fn we_recognize_signatures_generated_by_ref_impl() {
     use bls_sigs_ref::BLSSigCore;
-    use pairing_plus::bls12_381::G1;
+    use pairing_plus::bls12_381::G2;
     use pairing_plus::hash_to_field::ExpandMsgXmd;
 
     // Keygen
-    let (secret_key, public_key) = <G1 as BLSSigCore<ExpandMsgXmd<sha2::Sha256>>>::keygen(b"123");
+    let (secret_key, public_key) = <G2 as BLSSigCore<ExpandMsgXmd<sha2::Sha256>>>::keygen(b"123");
 
     // Sign message
     let message = b"KZen";
     let cs = &[1u8];
-    let signature: G1 =
+    let signature: G2 =
         BLSSigCore::<ExpandMsgXmd<sha2::Sha256>>::core_sign(secret_key, message, cs);
 
     // Verify signature
@@ -230,8 +230,8 @@ fn we_recognize_signatures_generated_by_ref_impl() {
     assert!(valid);
 
     // Now check that our primitive `BLSSignature` also successfully verifies signature
-    let public_key = GE2::from(public_key.into_affine());
-    let sigma = GE1::from(signature.into_affine());
+    let public_key = GE1::from(public_key.into_affine());
+    let sigma = GE2::from(signature.into_affine());
     let signature = BLSSignature { sigma };
     let valid = signature.verify(message, &public_key);
     assert!(valid);
