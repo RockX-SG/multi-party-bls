@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+use bls_sigs_ref::BLSSignaturePop;
 use crate::basic_bls::BLSSignature;
 use crate::threshold_bls::party_i::Keys;
 use crate::threshold_bls::party_i::SharedKeys;
@@ -5,7 +7,8 @@ use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSha
 use curv::elliptic::curves::bls12_381::g1::FE;
 use curv::elliptic::curves::bls12_381::{g1::GE as GE1, g2::GE as GE2};
 use curv::elliptic::curves::traits::{ECPoint, ECScalar};
-use pairing_plus::CurveProjective;
+use pairing_plus::bls12_381::{G1Compressed, G2Compressed};
+use pairing_plus::{CurveProjective, EncodedPoint};
 
 #[test]
 fn test_keygen_t1_n2() {
@@ -202,9 +205,8 @@ fn another_bls_impl_validates_signature() {
         G2::deserialize(&mut Cursor::new(signature), true).expect("deserialize signature");
 
     // Verify signature
-    let cs = &[1u8];
     let valid =
-        BLSSigCore::<ExpandMsgXmd<sha2::Sha256>>::core_verify(public_key, signature, message, cs);
+        <G2 as BLSSignaturePop<ExpandMsgXmd<sha2::Sha256>>>::verify(public_key, signature, message);
     assert!(valid);
 }
 
@@ -220,13 +222,12 @@ fn we_recognize_signatures_generated_by_ref_impl() {
 
     // Sign message
     let message = b"KZen";
-    let cs = &[1u8];
     let signature: G2 =
-        BLSSigCore::<ExpandMsgXmd<sha2::Sha256>>::core_sign(secret_key, message, cs);
+        <G2 as BLSSignaturePop<ExpandMsgXmd<sha2::Sha256>>>::sign(secret_key, message);
 
     // Verify signature
     let valid =
-        BLSSigCore::<ExpandMsgXmd<sha2::Sha256>>::core_verify(public_key, signature, message, cs);
+        <G2 as BLSSignaturePop<ExpandMsgXmd<sha2::Sha256>>>::verify(public_key, signature, message);
     assert!(valid);
 
     // Now check that our primitive `BLSSignature` also successfully verifies signature

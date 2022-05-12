@@ -18,6 +18,7 @@ use curv::elliptic::curves::bls12_381::g1::GE as GE1;
 use curv::elliptic::curves::bls12_381::g2::FE as FE2;
 use curv::elliptic::curves::bls12_381::g2::GE as GE2;
 use serde::{Deserialize, Serialize};
+use crate::utils::g2_hash_to_curve;
 
 const SECURITY: usize = 256;
 
@@ -196,7 +197,7 @@ impl SharedKeys {
     }
 
     pub fn partial_sign(&self, x: &[u8]) -> (PartialSignature, GE2) {
-        let H_x = GE2::hash_to_curve(x);
+        let H_x = g2_hash_to_curve(x);
         let sk_bn = ECScalar::to_big_int(&self.sk_i);
         let sk_i_fe1: FE2 = ECScalar::from(&sk_bn);
         let sigma_i = &H_x * &sk_i_fe1;

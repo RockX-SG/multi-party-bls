@@ -10,6 +10,7 @@ use curv::BigInt;
 
 use crate::aggregated_bls::h1;
 use crate::basic_bls::BLSSignature;
+use crate::utils::g2_hash_to_curve;
 
 /// This is an implementation of BDN18 [https://eprint.iacr.org/2018/483.pdf]
 /// protocol 3.1 (MSP): pairing-based multi-signature with public-key aggregation
@@ -47,7 +48,7 @@ impl Keys {
         let a_i = h1(self.party_index.clone(), pk_vec);
         let exp = BigInt::mod_mul(&a_i, &self.sk_i.to_big_int(), &FE2::q());
         let exp_fe1: FE2 = ECScalar::from(&exp);
-        let h_0_m = GE2::hash_to_curve(message);
+        let h_0_m = g2_hash_to_curve(message);
         h_0_m * exp_fe1
     }
 
@@ -71,7 +72,7 @@ impl Keys {
     fn core_aggregate_verify(apk_vec: &[APK], msg_vec: &[&[u8]], sig: &BLSSignature) -> bool {
         assert!(apk_vec.len() >= 1);
         let product_c2 = Pair::compute_pairing(&GE1::generator(), &sig.sigma);
-        let vec_g1: Vec<GE2> = msg_vec.iter().map(|&x| GE2::hash_to_curve(&x)).collect();
+        let vec_g1: Vec<GE2> = msg_vec.iter().map(|&x| g2_hash_to_curve(&x)).collect();
         let vec: Vec<_> = vec_g1.iter().zip(apk_vec.iter()).collect();
         let (head, tail) = vec.split_at(1);
         let product_c1 = tail
