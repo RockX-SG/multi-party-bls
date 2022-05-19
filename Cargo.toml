@@ -17,7 +17,7 @@ thiserror = "1.0.23"
 sha2 = "0.9.9"
 hex = "0.4.2"
 anyhow = "1.0.38"
-curv-kzen = "0.9"
+curv-kzen = { version = "0.9", default-features = false }
 group = "0.12.0"
 
 [dependencies.curv-bls12-381]
