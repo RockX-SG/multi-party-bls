@@ -11,17 +11,18 @@ serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
 zeroize = "1"
 rand = "0.7.3"
-pairing-plus = "0.19"
 ff-zeroize = "0.6.3"
 round-based = { version = "0.1.0", features = [] }
 thiserror = "1.0.23"
-sha2 = "0.8.0"
+sha2 = "0.9.9"
 hex = "0.4.2"
 anyhow = "1.0.38"
+curv-kzen = "0.9"
+group = "0.12.0"
 
-[dependencies.curv]
-git = "https://github.com/ZenGo-X/curv"
-tag = "v0.6.2"
+[dependencies.curv-bls12-381]
+git = "https://github.com/RockX-SG/curv-bls12-381"
+branch = "main"
 default-features = false
 
 [dev-dependencies]
@@ -48,8 +49,8 @@ tonic-build = "0.4.2"
 crate-type = ["lib"]
 
 [features]
-default = ["curv/rust-gmp-kzen"]
-num-bigint = ["curv/num-bigint"]
+default = ["curv-kzen/rust-gmp-kzen", "curv-bls12-381/rust-gmp-kzen"]
+num-bigint = ["curv-kzen/num-bigint", "curv-bls12-381/num-bigint"]
 # Internally used feature for testing purposes. You normally don't want to use it.
 dev = []
 

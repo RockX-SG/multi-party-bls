@@ -3,8 +3,8 @@
 use std::fmt;
 use std::mem::replace;
 use std::time::Duration;
+use curv_bls12_381::g2::GE2;
 
-use curv::elliptic::curves::bls12_381::g2::GE as GE2;
 use round_based::containers::{
     push::{Push, PushExt},
     *,
@@ -367,8 +367,8 @@ mod test {
         let (_, sigs): (Vec<_>, Vec<_>) = sign_simulation.run().unwrap().into_iter().unzip();
 
         // test all signatures are equal
-        let first = sigs[0];
-        assert!(sigs.iter().all(|&item| item == first));
+        let first = sigs[0].clone();
+        assert!(sigs.iter().all(|item| *item == first));
         // test the signatures pass verification
         assert!(parties_keys[0].shared_keys.verify(&sigs[0], msg));
 

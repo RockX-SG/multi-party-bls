@@ -1,24 +1,28 @@
+use std::ops::Add;
 use crate::Error;
 
 use curv::arithmetic::traits::*;
 
-use curv::elliptic::curves::traits::*;
-
 use curv::cryptographic_primitives::commitments::hash_commitment::HashCommitment;
 use curv::cryptographic_primitives::commitments::traits::Commitment;
 use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
-use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::{SecretShares, VerifiableSS};
 use curv::BigInt;
 
 use crate::basic_bls::BLSSignature;
 use crate::threshold_bls::utilities::{ECDDHProof, ECDDHStatement, ECDDHWitness};
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
-use curv::elliptic::curves::bls12_381::g1::FE as FE1;
-use curv::elliptic::curves::bls12_381::g1::GE as GE1;
-use curv::elliptic::curves::bls12_381::g2::FE as FE2;
-use curv::elliptic::curves::bls12_381::g2::GE as GE2;
+use curv::elliptic::curves::{ECPoint, ECScalar, Point, Scalar};
+use curv_bls12_381::{Bls12_381_1, Bls12_381_2};
+use curv_bls12_381::g1::GE1;
+use curv_bls12_381::g2::GE2;
+use curv_bls12_381::scalar::FieldScalar;
 use serde::{Deserialize, Serialize};
-use crate::utils::g2_hash_to_curve;
+use sha2::Sha256;
+
+type FE1 = FieldScalar;
+type PkCurve = Bls12_381_1;
+type SigCurve = Bls12_381_2;
 
 const SECURITY: usize = 256;
 
@@ -35,11 +39,11 @@ const SECURITY: usize = 256;
 /// We note that the DKG can probably be biased to some extent, however, we do not find it concerning
 /// for the threshold BLS application.
 
-#[derive(Copy, PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct Keys {
-    pub u_i: FE1,
+    pub u_i: FieldScalar,
     pub y_i: GE1,
-    pub party_index: usize,
+    pub party_index: u16,
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -55,15 +59,15 @@ pub struct KeyGenDecom {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SharedKeys {
-    pub index: usize,
+    pub index: u16,
     pub params: ShamirSecretSharing,
     pub vk: GE1,
-    pub sk_i: FE1,
+    pub sk_i: FieldScalar,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct PartialSignature {
-    pub index: usize,
+    pub index: u16,
     pub sigma_i: GE2,
     pub ddh_proof: ECDDHProof,
 }
@@ -74,9 +78,9 @@ pub struct Signature {
 }
 
 impl Keys {
-    pub fn phase1_create(index: usize) -> Keys {
-        let u: FE1 = ECScalar::new_random();
-        let y = &ECPoint::generator() * &u;
+    pub fn phase1_create(index: u16) -> Keys {
+        let u: FE1 = FE1::random();
+        let y = GE1::generator().scalar_mul(&u);
 
         Keys {
             u_i: u,
@@ -87,8 +91,8 @@ impl Keys {
 
     pub fn phase1_broadcast(&self) -> (KeyGenComm, KeyGenDecom) {
         let blind_factor = BigInt::sample(SECURITY);
-        let com = HashCommitment::create_commitment_with_user_defined_randomness(
-            &(self.y_i.bytes_compressed_to_big_int() + BigInt::from(self.party_index as u32)), // we add context to the hash function
+        let com = HashCommitment::<Sha256>::create_commitment_with_user_defined_randomness(
+            &(BigInt::from_bytes(&self.y_i.serialize_compressed()[..]) + BigInt::from(self.party_index as u32)), // we add context to the hash function
             &blind_factor,
         );
         let bcm1 = KeyGenComm { com };
@@ -104,23 +108,23 @@ impl Keys {
         params: &ShamirSecretSharing,
         decom_vec: &Vec<KeyGenDecom>,
         bc1_vec: &Vec<KeyGenComm>,
-    ) -> Result<(VerifiableSS<GE1>, Vec<FE1>, usize), Error> {
+    ) -> Result<(VerifiableSS<PkCurve>, SecretShares<PkCurve>, u16), Error> {
         // test length:
-        if decom_vec.len() != params.share_count || bc1_vec.len() != params.share_count {
+        if decom_vec.len() != params.share_count as usize || bc1_vec.len() != params.share_count as usize {
             return Err(Error::KeyGenMisMatchedVectors);
         }
         // test decommitments
         let correct_key_correct_decom_all = (0..bc1_vec.len())
             .map(|i| {
-                HashCommitment::create_commitment_with_user_defined_randomness(
-                    &(decom_vec[i].y_i.bytes_compressed_to_big_int() + BigInt::from(i as u32)),
+                HashCommitment::<Sha256>::create_commitment_with_user_defined_randomness(
+                    &(BigInt::from_bytes(&decom_vec[i].y_i.serialize_compressed()[..])+ BigInt::from(i as u32)),
                     &decom_vec[i].blind_factor,
                 ) == bc1_vec[i].com
             })
             .all(|x| x == true);
 
         let (vss_scheme, secret_shares) =
-            VerifiableSS::share(params.threshold, params.share_count, &self.u_i);
+            VerifiableSS::share(params.threshold, params.share_count, &Scalar::from_raw(self.u_i.clone()));
 
         match correct_key_correct_decom_all {
             true => Ok((vss_scheme, secret_shares, self.party_index.clone())),
@@ -131,14 +135,14 @@ impl Keys {
     pub fn phase2_verify_vss_construct_keypair_prove_dlog(
         &self,
         params: &ShamirSecretSharing,
-        y_vec: &Vec<GE1>,
-        secret_shares_vec: &Vec<FE1>,
-        vss_scheme_vec: &Vec<VerifiableSS<GE1>>,
-        index: &usize,
-    ) -> Result<(SharedKeys, DLogProof<GE1>), Error> {
-        if y_vec.len() != params.share_count
-            || secret_shares_vec.len() != params.share_count
-            || vss_scheme_vec.len() != params.share_count
+        y_vec: &Vec<Point<PkCurve>>,
+        secret_shares_vec: &Vec<Scalar<PkCurve>>,
+        vss_scheme_vec: &Vec<VerifiableSS<PkCurve>>,
+        index: &u16,
+    ) -> Result<(SharedKeys, DLogProof<PkCurve, Sha256>), Error> {
+        if y_vec.len() != params.share_count as usize
+            || secret_shares_vec.len() != params.share_count as usize
+            || vss_scheme_vec.len() != params.share_count as usize
         {
             return Err(Error::KeyGenMisMatchedVectors);
         }
@@ -148,22 +152,28 @@ impl Keys {
                 vss_scheme_vec[i]
                     .validate_share(&secret_shares_vec[i], *index)
                     .is_ok()
-                    && vss_scheme_vec[i].commitments[0] == y_vec[i]
+                    && vss_scheme_vec[i].commitments[0].clone() == y_vec[i]
             })
             .all(|x| x == true);
 
         match correct_ss_verify {
             true => {
                 let (head, tail) = y_vec.split_at(1);
-                let y = tail.iter().fold(head[0], |acc, x| acc + x);
-                let x_i = secret_shares_vec.iter().fold(FE1::zero(), |acc, x| acc + x);
-                let dlog_proof = DLogProof::prove(&x_i);
+                let mut y = head[0].clone();
+                for pt in tail.iter() {
+                    y = y.add(pt);
+                }
+                let mut x_i = FieldScalar::zero();
+                for x_i_j in secret_shares_vec.iter(){
+                    x_i.add_assign(&x_i_j.clone().into_raw());
+                }
+                let dlog_proof = DLogProof::prove(&Scalar::from_raw(x_i.clone()));
                 Ok((
                     SharedKeys {
                         index: self.party_index,
                         params: params.clone(),
-                        vk: y,
-                        sk_i: x_i,
+                        vk: y.into_raw(),
+                        sk_i: x_i.clone(),
                     },
                     dlog_proof,
                 ))
@@ -174,9 +184,9 @@ impl Keys {
 
     pub fn verify_dlog_proofs(
         params: &ShamirSecretSharing,
-        dlog_proofs_vec: &[DLogProof<GE1>],
+        dlog_proofs_vec: &[DLogProof<PkCurve, Sha256>],
     ) -> Result<(), Error> {
-        if dlog_proofs_vec.len() != params.share_count {
+        if dlog_proofs_vec.len() != params.share_count as usize{
             return Err(Error::KeyGenMisMatchedVectors);
         }
         let xi_dlog_verify = (0..dlog_proofs_vec.len())
@@ -193,21 +203,21 @@ impl Keys {
 
 impl SharedKeys {
     pub fn get_shared_pubkey(&self) -> GE1 {
-        GE1::generator() * &self.sk_i
+        GE1::generator().scalar_mul(&self.sk_i)
     }
 
     pub fn partial_sign(&self, x: &[u8]) -> (PartialSignature, GE2) {
-        let H_x = g2_hash_to_curve(x);
-        let sk_bn = ECScalar::to_big_int(&self.sk_i);
-        let sk_i_fe1: FE2 = ECScalar::from(&sk_bn);
-        let sigma_i = &H_x * &sk_i_fe1;
+        let dst = "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_".as_bytes();
+        let H_x = GE2::hash_to_curve(x, dst);
+        let sigma_i = H_x.scalar_mul(&self.sk_i);
 
+        let sk_bn = self.sk_i.to_bigint();
         let w = ECDDHWitness { x: sk_bn };
 
         let delta = ECDDHStatement {
             g1: H_x.clone(),
             h1: sigma_i.clone(),
-            g2: GE1::generator(),
+            g2: *GE1::generator(),
             h2: self.get_shared_pubkey(),
         };
         let ddh_proof = ECDDHProof::prove(&w, &delta);
@@ -225,15 +235,15 @@ impl SharedKeys {
 
     pub fn combine(
         &self,
-        vk_vec: &[GE1],
+        vk_vec: &[Point<PkCurve>],
         partial_sigs_vec: &[PartialSignature],
         H_x: GE2,
-        s: &[usize],
+        s: &[u16],
     ) -> Result<BLSSignature, Error> {
         if vk_vec.len() != partial_sigs_vec.len()
-            || vk_vec.len() < self.params.threshold
-            || s.len() < self.params.threshold
-            || s.len() > self.params.share_count
+            || vk_vec.len() < self.params.threshold as usize
+            || s.len() < self.params.threshold as usize
+            || s.len() > self.params.share_count as usize
         {
             return Err(Error::SigningMisMatchedVectors);
         }
@@ -244,8 +254,8 @@ impl SharedKeys {
                 let delta = ECDDHStatement {
                     g1: H_x.clone(),
                     h1: partial_sigs_vec[i].sigma_i.clone(),
-                    g2: GE1::generator(),
-                    h2: vk_vec[i],
+                    g2: *GE1::generator(),
+                    h2: vk_vec[i].clone().into_raw(),
                 };
 
                 partial_sigs_vec[i].ddh_proof.verify(&delta)
@@ -256,22 +266,31 @@ impl SharedKeys {
         }
 
         let (head, tail) = partial_sigs_vec.split_at(1);
-        let sigma = tail[0..self.params.threshold].iter().fold(
-            &head[0].sigma_i
-                * &VerifiableSS::<GE2>::map_share_to_new_params(
+        let mut sigma = head[0].sigma_i.scalar_mul(
+            &VerifiableSS::<SigCurve>::map_share_to_new_params(
+                &self.params,
+                head[0].index as u16,
+                &s[0..usize::from(self.params.threshold) + 1],
+            ).clone().into_raw());
+        for sig in tail[0..usize::from(self.params.threshold)].iter(){
+            sigma = sigma.add_point(&sig.sigma_i.scalar_mul(
+                &VerifiableSS::<SigCurve>::map_share_to_new_params(
                     &self.params,
-                    head[0].index,
-                    &s[0..self.params.threshold + 1],
-                ),
-            |acc, x| {
-                acc + &x.sigma_i
-                    * &VerifiableSS::<GE2>::map_share_to_new_params(
-                        &self.params,
-                        x.index,
-                        &s[0..self.params.threshold + 1],
-                    )
-            },
-        );
+                    sig.index as u16,
+                    &s[0..usize::from(self.params.threshold) + 1],
+                ).into_raw()));
+        }
+        // let sigma = tail[0..usize::from(self.params.threshold)].iter().fold(
+        //     &initial,
+        //     |acc:&GE2, x:&PartialSignature| {
+        //         &acc.add_point(&x.sigma_i.scalar_mul(
+        //             &VerifiableSS::<SigCurve>::map_share_to_new_params(
+        //                 &self.params,
+        //                 x.index as u16,
+        //                 &s[0..usize::from(self.params.threshold) + 1],
+        //             ).into_raw()))
+        //     },
+        // );
 
         return Ok(BLSSignature { sigma });
     }

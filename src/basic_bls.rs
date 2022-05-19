@@ -1,41 +1,34 @@
 #![allow(non_snake_case)]
 
-use std::convert::TryInto;
-use curv::elliptic::curves::bls12_381::g1::FE as FE1;
-use curv::elliptic::curves::bls12_381::g1::GE as GE1;
-use curv::elliptic::curves::bls12_381::g2::{FE as FE2, G2Point};
-use curv::elliptic::curves::bls12_381::g2::GE as GE2;
-use curv::elliptic::curves::bls12_381::Pair;
-use curv::elliptic::curves::traits::{ECPoint, ECScalar};
-
-use ff_zeroize::Field;
-use pairing_plus::bls12_381::{Fq12, G1Affine, G2, G2Affine};
-use pairing_plus::CurveProjective;
-use pairing_plus::hash_to_curve::HashToCurve;
-use pairing_plus::hash_to_field::ExpandMsgXmd;
-use pairing_plus::serdes::SerDes;
-use crate::utils::g2_hash_to_curve;
 use anyhow::Result;
-use curv::BigInt;
 use curv::arithmetic::Converter;
+use curv::BigInt;
+use curv::elliptic::curves::{ECPoint, ECScalar, Point};
+use curv_bls12_381::g1::GE1;
+use curv_bls12_381::g2::GE2;
+use curv_bls12_381::Pair;
+use curv_bls12_381::scalar::FieldScalar;
+use group::Group;
+
+type FE1 = FieldScalar;
 
 /// Based on https://eprint.iacr.org/2018/483.pdf
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct KeyPairG2 {
     Y: GE1,
     x: FE1,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct BLSSignature {
     pub sigma: GE2,
 }
 
 impl KeyPairG2 {
     pub fn new() -> Self {
-        let x: FE1 = ECScalar::new_random();
-        let Y = GE1::generator() * &x;
+        let x: FE1 = FE1::random();
+        let Y = GE1::generator().scalar_mul(&x);
         KeyPairG2 { x, Y }
     }
 
@@ -43,8 +36,9 @@ impl KeyPairG2 {
         let sk:Vec<u8> = hex::decode(sk)?;
 
         let sk = BigInt::from_bytes(&sk);
-        let x = ECScalar::from(&sk);
-        let Y = GE1::generator() * &x;
+
+        let x = FE1::from_bigint(&sk);
+        let Y = GE1::generator().scalar_mul(&x);
 
         let keypair = KeyPairG2{
             x,Y
@@ -56,25 +50,32 @@ impl KeyPairG2 {
 impl BLSSignature {
     // compute sigma  = x H(m)
     pub fn sign(message: &[u8], keys: &KeyPairG2) -> Self {
-        let H_m = g2_hash_to_curve(message);
-        let fe1_x: FE2 = ECScalar::from(&ECScalar::to_big_int(&keys.x));
+        let dst = "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_".as_bytes();
+        let H_m = GE2::hash_to_curve(message, dst);
         BLSSignature {
-            sigma: H_m * &fe1_x,
+            sigma: H_m.scalar_mul(&keys.x),
         }
     }
 
     // check e(H(m), Y) == e(sigma, g2)
     pub fn verify(&self, message: &[u8], pubkey: &GE1) -> bool {
-        let H_m = g2_hash_to_curve(message);
-        let product = Pair::efficient_pairing_mul( pubkey,&H_m,  &(-GE1::generator()), &self.sigma);
-        product.e == Fq12::one()
+        let dst = "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_".as_bytes();
+        let H_m = GE2::hash_to_curve(message, dst);
+        let product = Pair::efficient_pairing_mul(
+            &Point::from_raw(pubkey.clone()).unwrap(),
+            &Point::from_raw(H_m).unwrap(),
+            &Point::from_raw(GE1::generator().neg_point()).unwrap(),
+            &Point::from_raw(self.sigma).unwrap()
+        );
+        product.e.is_identity().into()
     }
 
     pub fn to_bytes(&self, compressed: bool) -> Vec<u8> {
-        let mut pk = vec![];
-        G2Affine::serialize( &self.sigma.get_element(),&mut pk, compressed)
-            .expect("serialize to vec should always succeed");
-        pk
+        if compressed {
+            self.sigma.serialize_compressed().to_vec()
+        } else {
+            self.sigma.serialize_uncompressed().to_vec()
+        }
     }
 }
 
@@ -114,7 +115,6 @@ mod test {
         let signature = BLSSignature::sign(&message_bytes[..], &keypair);
         let sigBytes = signature.to_bytes(true);
 
-        println!("pubkey is: {}", hex::encode(keypair.Y.pk_to_key_slice()));
         assert!(signature.verify(&message_bytes[..], &keypair.Y));
         assert_eq!(sig, hex::encode(sigBytes));
     }

@@ -1,6 +1,6 @@
-use curv::elliptic::curves::bls12_381::g2::GE as GE2;
-use round_based::containers::push::Push;
+use curv_bls12_381::g2::GE2;
 use round_based::containers::{self, BroadcastMsgs, Store};
+use round_based::containers::push::Push;
 use round_based::Msg;
 use thiserror::Error;
 
@@ -63,14 +63,14 @@ impl Round1 {
                     claimed_index: keygen_i,
                 });
             }
-            vk_vec.push(self.key.vk_vec[usize::from(keygen_i) - 1])
+            vk_vec.push(self.key.vk_vec[usize::from(keygen_i) - 1].clone())
         }
 
-        let indexes: Vec<_> = indexes.into_iter().map(|i| usize::from(i) - 1).collect();
+        let indexes: Vec<_> = indexes.into_iter().map(|i| i - 1).collect();
         let sig = self
             .key
             .shared_keys
-            .combine(&vk_vec, &sigs, self.message, &indexes)
+            .combine(vk_vec.as_slice(), &sigs, self.message, &indexes)
             .map_err(ProceedError::PartialSignatureVerification)?;
         Ok((self.message, sig))
     }

@@ -1,6 +1,6 @@
 use crate::aggregated_bls::party_i::{Keys, APK};
 use crate::basic_bls::BLSSignature;
-use curv::elliptic::curves::bls12_381::g1::GE as GE1;
+use curv_bls12_381::g1::GE1;
 
 // test 3 out of 3
 #[test]

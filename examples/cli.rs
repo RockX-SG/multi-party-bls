@@ -2,7 +2,9 @@ use std::net::SocketAddr;
 use std::process::exit;
 
 use anyhow::{anyhow, bail, Context, Result};
-use curv::elliptic::curves::traits::ECPoint;
+use curv::elliptic::curves::ECPoint;
+use curv_bls12_381::g1::GE1;
+use curv_bls12_381::g2::GE2;
 use structopt::StructOpt;
 use tokio::runtime;
 use tracing::{error, info};
@@ -106,7 +108,7 @@ async fn keygen(
         .context("save local secret key to file")?;
     info!("Local secret key saved to {:?}", output_path);
 
-    let public_key = curv::elliptic::curves::traits::ECPoint::pk_to_key_slice(&output.public_key());
+    let public_key = output.public_key().serialize_compressed();
     println!("Public key: {}", hex::encode(public_key));
 
     Ok(())
@@ -146,7 +148,7 @@ async fn sign(
         .context("sign execution error")?;
     info!("Signing successfully finished!");
 
-    let public_key = curv::elliptic::curves::traits::ECPoint::pk_to_key_slice(&sig.sigma);
+    let public_key = sig.sigma.serialize_compressed();
     println!("Signature: {}", hex::encode(public_key));
     Ok(())
 }
@@ -158,7 +160,6 @@ fn verify(
         digits: digest,
     }: VerifyArgs,
 ) -> Result<()> {
-    use curv::elliptic::curves::bls12_381::{g1::GE as GE1, g2::GE as GE2};
     use bls_eth::basic_bls::BLSSignature;
 
     let public_key =
@@ -166,14 +167,10 @@ fn verify(
     let signature =
         hex::decode(signature).context("signature key is not valid hex encoded string")?;
 
-    let public_key = GE1::from_bytes(&public_key)
+    let public_key = GE1::deserialize(&public_key)
         .map_err(|e| anyhow!("public key is not valid g1 point: {:?}", e))?;
-    let signature = GE2::from_bytes(&signature)
+    let signature = GE2::deserialize(&signature)
         .map_err(|e| anyhow!("signature is not valid g2 point: {:?}", e))?;
-
-    signature.x_coor();
-    println!("Sig x:\n{:?}\n", signature.x_coor());
-    println!("Sig y:\n{:?}\n", signature.y_coor());
 
     let valid = BLSSignature { sigma: signature }.verify(&digest, &public_key);
     if valid {

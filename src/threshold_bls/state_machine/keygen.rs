@@ -6,14 +6,15 @@ use std::time::Duration;
 
 use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
-use curv::elliptic::curves::bls12_381::g1::FE as FE1;
-use curv::elliptic::curves::bls12_381::g1::GE as GE1;
+use curv::elliptic::curves::Scalar;
+use curv_bls12_381::Bls12_381_1;
 use round_based::containers::{
     push::{Push, PushExt},
     *,
 };
 use round_based::{IsCritical, Msg, StateMachine};
 use serde::{Deserialize, Serialize};
+use sha2::Sha256;
 use thiserror::Error;
 
 use crate::threshold_bls::party_i;
@@ -21,6 +22,7 @@ use crate::threshold_bls::party_i;
 mod rounds;
 pub use rounds::{LocalKey, ProceedError};
 use rounds::{Round0, Round1, Round2, Round3, Round4};
+type PkCurve = Bls12_381_1;
 
 /// Keygen protocol state machine
 ///
@@ -31,8 +33,8 @@ pub struct Keygen {
 
     msgs1: Option<Store<BroadcastMsgs<party_i::KeyGenComm>>>,
     msgs2: Option<Store<BroadcastMsgs<party_i::KeyGenDecom>>>,
-    msgs3: Option<Store<P2PMsgs<(VerifiableSS<GE1>, FE1)>>>,
-    msgs4: Option<Store<BroadcastMsgs<DLogProof<GE1>>>>,
+    msgs3: Option<Store<P2PMsgs<(VerifiableSS<PkCurve>, Scalar<PkCurve>)>>>,
+    msgs4: Option<Store<BroadcastMsgs<DLogProof<PkCurve, Sha256>>>>,
 
     msgs_queue: Vec<Msg<ProtocolMessage>>,
 
@@ -399,8 +401,8 @@ pub struct ProtocolMessage(M);
 enum M {
     Round1(party_i::KeyGenComm),
     Round2(party_i::KeyGenDecom),
-    Round3((VerifiableSS<GE1>, FE1)),
-    Round4(DLogProof<GE1>),
+    Round3((VerifiableSS<PkCurve>, Scalar<PkCurve>)),
+    Round4(DLogProof<PkCurve, Sha256>),
 }
 
 // Error

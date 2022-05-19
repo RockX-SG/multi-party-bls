@@ -1,16 +1,17 @@
 use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
-use curv::cryptographic_primitives::secret_sharing::feldman_vss::{
-    ShamirSecretSharing, VerifiableSS,
-};
-use curv::elliptic::curves::bls12_381::g1::FE as FE1;
-use curv::elliptic::curves::bls12_381::g1::GE as GE1;
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::{ShamirSecretSharing, VerifiableSS};
+use curv::elliptic::curves::{Point, Scalar};
+use curv_bls12_381::g1::GE1;
 use round_based::containers::push::Push;
 use round_based::containers::{self, BroadcastMsgs, P2PMsgs, Store};
 use round_based::Msg;
 use serde::{Deserialize, Serialize};
+use sha2::Sha256;
 use thiserror::Error;
 
 use crate::threshold_bls::party_i;
+
+type PkCurve = curv_bls12_381::Bls12_381_1;
 
 pub struct Round0 {
     pub party_i: u16,
@@ -23,7 +24,7 @@ impl Round0 {
     where
         O: Push<Msg<party_i::KeyGenComm>>,
     {
-        let keys = party_i::Keys::phase1_create(usize::from(self.party_i) - 1);
+        let keys = party_i::Keys::phase1_create(self.party_i - 1);
         let (comm, decom) = keys.phase1_broadcast();
         output.push(Msg {
             sender: self.party_i,
@@ -103,7 +104,7 @@ impl Round2 {
         mut output: O,
     ) -> Result<Round3>
     where
-        O: Push<Msg<(VerifiableSS<GE1>, FE1)>>,
+        O: Push<Msg<(VerifiableSS<PkCurve>, Scalar<PkCurve>)>>,
     {
         let params = ShamirSecretSharing {
             threshold: self.t.into(),
@@ -133,7 +134,7 @@ impl Round2 {
 
             index,
             own_vss: vss_scheme,
-            own_share: secret_shares[usize::from(self.party_i - 1)],
+            own_share: secret_shares[usize::from(self.party_i - 1)].clone(),
 
             party_i: self.party_i,
             t: self.t,
@@ -153,9 +154,9 @@ pub struct Round3 {
 
     y_vec: Vec<GE1>,
 
-    index: usize,
-    own_vss: VerifiableSS<GE1>,
-    own_share: FE1,
+    index: u16,
+    own_vss: VerifiableSS<PkCurve>,
+    own_share: Scalar<PkCurve>,
 
     party_i: u16,
     t: u16,
@@ -165,11 +166,11 @@ pub struct Round3 {
 impl Round3 {
     pub fn proceed<O>(
         self,
-        input: P2PMsgs<(VerifiableSS<GE1>, FE1)>,
+        input: P2PMsgs<(VerifiableSS<PkCurve>, Scalar<PkCurve>)>,
         mut output: O,
     ) -> Result<Round4>
     where
-        O: Push<Msg<DLogProof<GE1>>>,
+        O: Push<Msg<DLogProof<PkCurve, Sha256>>>,
     {
         let params = ShamirSecretSharing {
             threshold: self.t.into(),
@@ -180,11 +181,12 @@ impl Round3 {
             .into_iter()
             .unzip();
 
+        let y_vec = self.y_vec.iter().map(|y|Point::from_raw(y.clone()).unwrap()).collect::<Vec<Point<PkCurve>>>();
         let (shared_keys, dlog_proof) = self
             .keys
             .phase2_verify_vss_construct_keypair_prove_dlog(
                 &params,
-                &self.y_vec,
+                &y_vec,
                 &party_shares,
                 &vss_schemes,
                 &(self.index + 1),
@@ -209,14 +211,14 @@ impl Round3 {
     pub fn is_expensive(&self) -> bool {
         true
     }
-    pub fn expects_messages(i: u16, n: u16) -> Store<P2PMsgs<(VerifiableSS<GE1>, FE1)>> {
+    pub fn expects_messages(i: u16, n: u16) -> Store<P2PMsgs<(VerifiableSS<PkCurve>, Scalar<PkCurve>)>> {
         containers::P2PMsgsStore::new(i, n)
     }
 }
 
 pub struct Round4 {
     shared_keys: party_i::SharedKeys,
-    own_dlog_proof: DLogProof<GE1>,
+    own_dlog_proof: DLogProof<PkCurve, Sha256>,
 
     party_i: u16,
     t: u16,
@@ -224,7 +226,7 @@ pub struct Round4 {
 }
 
 impl Round4 {
-    pub fn proceed(self, input: BroadcastMsgs<DLogProof<GE1>>) -> Result<LocalKey> {
+    pub fn proceed(self, input: BroadcastMsgs<DLogProof<PkCurve, Sha256>>) -> Result<LocalKey> {
         let params = ShamirSecretSharing {
             threshold: self.t.into(),
             share_count: self.n.into(),
@@ -245,7 +247,7 @@ impl Round4 {
     pub fn is_expensive(&self) -> bool {
         true
     }
-    pub fn expects_messages(i: u16, n: u16) -> Store<BroadcastMsgs<DLogProof<GE1>>> {
+    pub fn expects_messages(i: u16, n: u16) -> Store<BroadcastMsgs<DLogProof<PkCurve, Sha256>>> {
         containers::BroadcastMsgsStore::new(i, n)
     }
 }
@@ -254,7 +256,7 @@ impl Round4 {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct LocalKey {
     pub(in crate::threshold_bls::state_machine) shared_keys: party_i::SharedKeys,
-    pub(in crate::threshold_bls::state_machine) vk_vec: Vec<GE1>,
+    pub(in crate::threshold_bls::state_machine) vk_vec: Vec<Point<PkCurve>>,
 
     pub(in crate::threshold_bls::state_machine) i: u16,
     pub(in crate::threshold_bls::state_machine) t: u16,
