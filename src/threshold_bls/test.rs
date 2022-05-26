@@ -1,5 +1,3 @@
-use std::convert::TryInto;
-
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
 
 use crate::basic_bls::BLSSignature;
