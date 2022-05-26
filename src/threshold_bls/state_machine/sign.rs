@@ -3,23 +3,26 @@
 use std::fmt;
 use std::mem::replace;
 use std::time::Duration;
-use curv_bls12_381::g2::GE2;
 
-use round_based::containers::{
-    push::{Push, PushExt},
-    *,
-};
+use curv::elliptic::curves::Point;
+use curv_bls12_381::Bls12_381_2;
 use round_based::{IsCritical, Msg, StateMachine};
+use round_based::containers::{
+    *,
+    push::{Push, PushExt},
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+use private::InternalError;
+use rounds::{Round0, Round1};
+pub use rounds::ProceedError;
 
 use crate::basic_bls::BLSSignature;
 use crate::threshold_bls::party_i;
 use crate::threshold_bls::state_machine::keygen::LocalKey;
 
 mod rounds;
-pub use rounds::ProceedError;
-use rounds::{Round0, Round1};
 
 /// Signing protocol state machine
 ///
@@ -79,8 +82,8 @@ impl Sign {
     }
 
     fn gmap_queue<'a, T, F>(&'a mut self, mut f: F) -> impl Push<Msg<T>> + 'a
-    where
-        F: FnMut(T) -> M + 'a,
+        where
+            F: FnMut(T) -> M + 'a,
     {
         (&mut self.msgs_queue).gmap(move |m: Msg<T>| m.map_body(|m| ProtocolMessage(f(m))))
     }
@@ -138,7 +141,7 @@ impl Sign {
 impl StateMachine for Sign {
     type MessageBody = ProtocolMessage;
     type Err = Error;
-    type Output = (GE2, BLSSignature);
+    type Output = (Point<Bls12_381_2>, BLSSignature);
 
     fn handle_incoming(&mut self, msg: Msg<Self::MessageBody>) -> Result<()> {
         let current_round = self.current_round();
@@ -254,7 +257,7 @@ pub enum Error {
     HandleMessage(#[source] StoreErr),
     /// Received message which we didn't expect to receive now (e.g. message from previous round)
     #[error(
-        "didn't expect to receive message from round {msg_round} (being at round {current_round})"
+    "didn't expect to receive message from round {msg_round} (being at round {current_round})"
     )]
     ReceivedOutOfOrderMessage { current_round: u16, msg_round: u16 },
     /// [Sign::pick_output] called twice
@@ -279,7 +282,6 @@ impl From<InternalError> for Error {
     }
 }
 
-use private::InternalError;
 mod private {
     #[derive(Debug)]
     #[non_exhaustive]
@@ -319,7 +321,7 @@ impl fmt::Debug for Sign {
 enum R {
     Round0(Round0),
     Round1(Round1),
-    Final((GE2, BLSSignature)),
+    Final((Point<Bls12_381_2>, BLSSignature)),
     Gone,
 }
 
@@ -340,8 +342,9 @@ enum M {
 mod test {
     use round_based::dev::Simulation;
 
-    use super::*;
     use crate::threshold_bls::state_machine::keygen::Keygen;
+
+    use super::*;
 
     fn simulate_sign(msg: &[u8], s: &[u16], t: u16, n: u16) {
         // Keygen

@@ -1,4 +1,5 @@
-use curv_bls12_381::g2::GE2;
+use curv::elliptic::curves::Point;
+use curv_bls12_381::Bls12_381_2;
 use round_based::containers::{self, BroadcastMsgs, Store};
 use round_based::containers::push::Push;
 use round_based::Msg;
@@ -18,8 +19,8 @@ pub struct Round0 {
 
 impl Round0 {
     pub fn proceed<O>(self, mut output: O) -> Result<Round1>
-    where
-        O: Push<Msg<(u16, party_i::PartialSignature)>>,
+        where
+            O: Push<Msg<(u16, party_i::PartialSignature)>>,
     {
         let (partial_sig, H_x) = self.key.shared_keys.partial_sign(&self.message);
         output.push(Msg {
@@ -40,7 +41,7 @@ impl Round0 {
 
 pub struct Round1 {
     key: LocalKey,
-    message: GE2,
+    message: Point<Bls12_381_2>,
 
     partial_sig: party_i::PartialSignature,
 }
@@ -49,7 +50,7 @@ impl Round1 {
     pub fn proceed(
         self,
         input: BroadcastMsgs<(u16, party_i::PartialSignature)>,
-    ) -> Result<(GE2, BLSSignature)> {
+    ) -> Result<(Point<Bls12_381_2>, BLSSignature)> {
         let (indexes, sigs): (Vec<_>, Vec<_>) = input
             .into_vec_including_me((self.key.i, self.partial_sig))
             .into_iter()
@@ -70,7 +71,7 @@ impl Round1 {
         let sig = self
             .key
             .shared_keys
-            .combine(vk_vec.as_slice(), &sigs, self.message, &indexes)
+            .combine(vk_vec.as_slice(), &sigs, &self.message, &indexes)
             .map_err(ProceedError::PartialSignatureVerification)?;
         Ok((self.message, sig))
     }
@@ -96,7 +97,7 @@ pub enum ProceedError {
     /// Every party needs to say which index it was using at keygen. This error is raised if
     /// `index == 0 || index > n` where n is a number of parties holding a key.
     #[error(
-        "party {who} claimed its index at keygen was {claimed_index} which is not in range [1;n]"
+    "party {who} claimed its index at keygen was {claimed_index} which is not in range [1;n]"
     )]
     PartySentOutOfRangeIndex { who: u16, claimed_index: u16 },
     #[error("partial signatures verification: {0:?}")]

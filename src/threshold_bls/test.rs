@@ -1,12 +1,14 @@
 use std::convert::TryInto;
+
 use bls_sigs_ref::BLSSignaturePop;
-use crate::basic_bls::BLSSignature;
-use crate::threshold_bls::party_i::Keys;
-use crate::threshold_bls::party_i::SharedKeys;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
 use curv::elliptic::curves::{ECPoint, ECScalar, Point, Scalar};
 use curv_bls12_381::Bls12_381_1;
 use curv_bls12_381::scalar::FieldScalar;
+
+use crate::basic_bls::BLSSignature;
+use crate::threshold_bls::party_i::Keys;
+use crate::threshold_bls::party_i::SharedKeys;
 
 type PkCurve = Bls12_381_1;
 type FE1 = FieldScalar;
@@ -68,7 +70,7 @@ pub fn keygen_t_n_parties(t: u16, n: u16) -> KeygenOutput {
 
     let n = n as usize;
     let t = t as usize;
-    let y_vec = (0..n).map(|i| Point::from_raw(decom_vec[i].y_i).unwrap()).collect::<Vec<Point<PkCurve>>>();
+    let y_vec = (0..n).map(|i| decom_vec[i].y_i.clone()).collect::<Vec<Point<PkCurve>>>();
 
     let mut vss_scheme_vec = Vec::new();
     let mut secret_shares_vec = Vec::new();
@@ -122,13 +124,13 @@ pub fn keygen_t_n_parties(t: u16, n: u16) -> KeygenOutput {
 
     //test
     let xi_vec = (0..=t)
-        .map(|i| Scalar::from_raw(shared_keys_vec[i].sk_i.clone()))
+        .map(|i| shared_keys_vec[i].sk_i.clone())
         .collect::<Vec<Scalar<PkCurve>>>();
     let x = vss_scheme_vec[0]
         .clone()
         .reconstruct(&index_vec[0..=t], &xi_vec);
-    let sum_u_i = party_keys_vec.iter().fold(FE1::zero(), |acc, x| acc.add(&x.u_i));
-    assert_eq!(x.into_raw(), sum_u_i);
+    let sum_u_i = party_keys_vec.iter().fold(Scalar::zero(), |acc, x| acc + &x.u_i);
+    assert_eq!(x, sum_u_i);
 
     (shared_keys_vec, vk_vec)
 }
@@ -149,7 +151,7 @@ pub fn sign(
         .map(|i| shared_keys_vec[s[i] as usize].clone())
         .collect::<Vec<SharedKeys>>();
     let vk_participating_parties = (0..t_prime)
-        .map(|i|vk_vec[s[i] as usize].clone())
+        .map(|i| vk_vec[s[i] as usize].clone())
         .collect::<Vec<Point<PkCurve>>>();
 
     // each party performs a partial sign
@@ -165,10 +167,10 @@ pub fn sign(
             k.combine(
                 &vk_participating_parties[..],
                 &partial_sign_vec[..],
-                H_x[0],
+                &H_x[0],
                 s,
             )
-            .expect("")
+                .expect("")
         })
         .collect::<Vec<BLSSignature>>();
 

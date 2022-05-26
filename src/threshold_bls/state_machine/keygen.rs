@@ -8,20 +8,23 @@ use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::VerifiableSS;
 use curv::elliptic::curves::Scalar;
 use curv_bls12_381::Bls12_381_1;
-use round_based::containers::{
-    push::{Push, PushExt},
-    *,
-};
 use round_based::{IsCritical, Msg, StateMachine};
+use round_based::containers::{
+    *,
+    push::{Push, PushExt},
+};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use thiserror::Error;
 
+use private::InternalError;
+pub use rounds::{LocalKey, ProceedError};
+use rounds::{Round0, Round1, Round2, Round3, Round4};
+
 use crate::threshold_bls::party_i;
 
 mod rounds;
-pub use rounds::{LocalKey, ProceedError};
-use rounds::{Round0, Round1, Round2, Round3, Round4};
+
 type PkCurve = Bls12_381_1;
 
 /// Keygen protocol state machine
@@ -82,8 +85,8 @@ impl Keygen {
     }
 
     fn gmap_queue<'a, T, F>(&'a mut self, mut f: F) -> impl Push<Msg<T>> + 'a
-    where
-        F: FnMut(T) -> M + 'a,
+        where
+            F: FnMut(T) -> M + 'a,
     {
         (&mut self.msgs_queue).gmap(move |m: Msg<T>| m.map_body(|m| ProtocolMessage(f(m))))
     }
@@ -432,7 +435,7 @@ pub enum Error {
     HandleMessage(#[source] StoreErr),
     /// Received message which we didn't expect to receive now (e.g. message from previous round)
     #[error(
-        "didn't expect to receive message from round {msg_round} (being at round {current_round})"
+    "didn't expect to receive message from round {msg_round} (being at round {current_round})"
     )]
     ReceivedOutOfOrderMessage { current_round: u16, msg_round: u16 },
     /// [Keygen::pick_output] called twice
@@ -457,7 +460,6 @@ impl From<InternalError> for Error {
     }
 }
 
-use private::InternalError;
 mod private {
     #[derive(Debug)]
     #[non_exhaustive]

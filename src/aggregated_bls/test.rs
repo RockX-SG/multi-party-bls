@@ -1,6 +1,9 @@
-use crate::aggregated_bls::party_i::{Keys, APK};
-use crate::basic_bls::BLSSignature;
+use curv::elliptic::curves::Point;
+use curv_bls12_381::Bls12_381_1;
 use curv_bls12_381::g1::GE1;
+
+use crate::aggregated_bls::party_i::{APK, Keys};
+use crate::basic_bls::BLSSignature;
 
 // test 3 out of 3
 #[test]
@@ -10,7 +13,7 @@ fn agg_sig_test_3() {
     let p3_keys = Keys::new(2);
 
     // each party broadcasts its public key pk_i
-    let pk_vec = vec![p1_keys.pk_i, p2_keys.pk_i, p3_keys.pk_i];
+    let pk_vec = vec![p1_keys.pk_i.clone(), p2_keys.pk_i.clone(), p3_keys.pk_i.clone()];
 
     // each party computes APK
     let apk = Keys::aggregate(&pk_vec);
@@ -107,14 +110,14 @@ pub fn agg_sig_test_n_batch_m(n: usize, msg_vec: &[&[u8]], bad_m_v: &[&[u8]]) {
     );
 }
 
-fn keygen(n_parties: usize) -> (Vec<Keys>, Vec<GE1>, APK) {
+fn keygen(n_parties: usize) -> (Vec<Keys>, Vec<Point<Bls12_381_1>>, APK) {
     let keys_vec: Vec<Keys> = (0..n_parties).map(|i| Keys::new(i)).collect();
-    let pk_vec: Vec<GE1> = keys_vec.iter().map(|x| x.pk_i).collect();
-    let apk = Keys::aggregate(&pk_vec);
+    let pk_vec: Vec<Point<Bls12_381_1>> = keys_vec.iter().map(|x| x.pk_i.clone()).collect();
+    let apk = Keys::aggregate(pk_vec.as_slice());
     (keys_vec, pk_vec, apk)
 }
 
-fn keygen_batch(n_parties: usize, m_batches: usize) -> (Vec<Vec<Keys>>, Vec<Vec<GE1>>, Vec<APK>) {
+fn keygen_batch(n_parties: usize, m_batches: usize) -> (Vec<Vec<Keys>>, Vec<Vec<Point<Bls12_381_1>>>, Vec<APK>) {
     let keygen_vec_batch: Vec<_> = (0..m_batches).map(|_| keygen(n_parties)).collect();
     let keys_vec_batch = keygen_vec_batch.iter().map(|x| x.0.clone()).collect();
     let pk_vec_batch = keygen_vec_batch.iter().map(|x| x.1.clone()).collect();
@@ -125,13 +128,13 @@ fn keygen_batch(n_parties: usize, m_batches: usize) -> (Vec<Vec<Keys>>, Vec<Vec<
 fn sign_batch(
     n_parties: usize,
     key_vec: &Vec<Vec<Keys>>,
-    pk_vec: &Vec<Vec<GE1>>,
+    pk_vec: &Vec<Vec<Point<Bls12_381_1>>>,
     msg_vec: &[&[u8]],
 ) -> BLSSignature {
     let sig_vec: Vec<Vec<_>> = (0..msg_vec.len())
         .map(|i| {
             (0..n_parties)
-                .map(|j| key_vec[i][j].local_sign(msg_vec[i], &pk_vec[i]))
+                .map(|j| key_vec[i][j].local_sign(msg_vec[i], pk_vec[i].as_slice()))
                 .collect()
         })
         .collect();

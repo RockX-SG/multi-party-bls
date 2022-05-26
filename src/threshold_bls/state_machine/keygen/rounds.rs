@@ -1,9 +1,9 @@
 use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::{ShamirSecretSharing, VerifiableSS};
 use curv::elliptic::curves::{Point, Scalar};
-use curv_bls12_381::g1::GE1;
-use round_based::containers::push::Push;
+use curv_bls12_381::Bls12_381_1;
 use round_based::containers::{self, BroadcastMsgs, P2PMsgs, Store};
+use round_based::containers::push::Push;
 use round_based::Msg;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
@@ -21,8 +21,8 @@ pub struct Round0 {
 
 impl Round0 {
     pub fn proceed<O>(self, mut output: O) -> Result<Round1>
-    where
-        O: Push<Msg<party_i::KeyGenComm>>,
+        where
+            O: Push<Msg<party_i::KeyGenComm>>,
     {
         let keys = party_i::Keys::phase1_create(self.party_i - 1);
         let (comm, decom) = keys.phase1_broadcast();
@@ -61,8 +61,8 @@ impl Round1 {
         input: BroadcastMsgs<party_i::KeyGenComm>,
         mut output: O,
     ) -> Result<Round2>
-    where
-        O: Push<Msg<party_i::KeyGenDecom>>,
+        where
+            O: Push<Msg<party_i::KeyGenDecom>>,
     {
         output.push(Msg {
             sender: self.party_i,
@@ -103,8 +103,8 @@ impl Round2 {
         input: BroadcastMsgs<party_i::KeyGenDecom>,
         mut output: O,
     ) -> Result<Round3>
-    where
-        O: Push<Msg<(VerifiableSS<PkCurve>, Scalar<PkCurve>)>>,
+        where
+            O: Push<Msg<(VerifiableSS<PkCurve>, Scalar<PkCurve>)>>,
     {
         let params = ShamirSecretSharing {
             threshold: self.t.into(),
@@ -152,7 +152,7 @@ impl Round2 {
 pub struct Round3 {
     keys: party_i::Keys,
 
-    y_vec: Vec<GE1>,
+    y_vec: Vec<Point<Bls12_381_1>>,
 
     index: u16,
     own_vss: VerifiableSS<PkCurve>,
@@ -169,8 +169,8 @@ impl Round3 {
         input: P2PMsgs<(VerifiableSS<PkCurve>, Scalar<PkCurve>)>,
         mut output: O,
     ) -> Result<Round4>
-    where
-        O: Push<Msg<DLogProof<PkCurve, Sha256>>>,
+        where
+            O: Push<Msg<DLogProof<PkCurve, Sha256>>>,
     {
         let params = ShamirSecretSharing {
             threshold: self.t.into(),
@@ -181,7 +181,7 @@ impl Round3 {
             .into_iter()
             .unzip();
 
-        let y_vec = self.y_vec.iter().map(|y|Point::from_raw(y.clone()).unwrap()).collect::<Vec<Point<PkCurve>>>();
+        let y_vec = self.y_vec.iter().map(|y| y.clone()).collect::<Vec<Point<PkCurve>>>();
         let (shared_keys, dlog_proof) = self
             .keys
             .phase2_verify_vss_construct_keypair_prove_dlog(
@@ -265,8 +265,8 @@ pub struct LocalKey {
 
 impl LocalKey {
     /// Public key of secret shared between parties
-    pub fn public_key(&self) -> GE1 {
-        self.shared_keys.vk
+    pub fn public_key(&self) -> Point<Bls12_381_1> {
+        self.shared_keys.vk.clone()
     }
 }
 

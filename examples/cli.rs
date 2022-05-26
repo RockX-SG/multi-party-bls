@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use std::process::exit;
 
 use anyhow::{anyhow, bail, Context, Result};
-use curv::elliptic::curves::ECPoint;
+use curv::elliptic::curves::{ECPoint, Point, Scalar};
 use curv_bls12_381::g1::GE1;
 use curv_bls12_381::g2::GE2;
 use structopt::StructOpt;
@@ -108,7 +108,7 @@ async fn keygen(
         .context("save local secret key to file")?;
     info!("Local secret key saved to {:?}", output_path);
 
-    let public_key = output.public_key().serialize_compressed();
+    let public_key = output.public_key().to_bytes(true).to_vec();
     println!("Public key: {}", hex::encode(public_key));
 
     Ok(())
@@ -148,7 +148,7 @@ async fn sign(
         .context("sign execution error")?;
     info!("Signing successfully finished!");
 
-    let public_key = sig.sigma.serialize_compressed();
+    let public_key = sig.sigma.to_bytes(true).to_vec();
     println!("Signature: {}", hex::encode(public_key));
     Ok(())
 }
@@ -172,6 +172,8 @@ fn verify(
     let signature = GE2::deserialize(&signature)
         .map_err(|e| anyhow!("signature is not valid g2 point: {:?}", e))?;
 
+    let public_key = Point::from_raw(public_key)?;
+    let signature = Point::from_raw(signature)?;
     let valid = BLSSignature { sigma: signature }.verify(&digest, &public_key);
     if valid {
         println!("Signature is valid");

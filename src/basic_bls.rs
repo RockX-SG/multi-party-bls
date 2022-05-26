@@ -3,45 +3,41 @@
 use anyhow::Result;
 use curv::arithmetic::Converter;
 use curv::BigInt;
-use curv::elliptic::curves::{ECPoint, ECScalar, Point};
-use curv_bls12_381::g1::GE1;
+use curv::elliptic::curves::{Point, Scalar};
+use curv_bls12_381::{Bls12_381_1, Bls12_381_2, Pair};
 use curv_bls12_381::g2::GE2;
-use curv_bls12_381::Pair;
-use curv_bls12_381::scalar::FieldScalar;
 use group::Group;
 
-type FE1 = FieldScalar;
-
 /// Based on https://eprint.iacr.org/2018/483.pdf
-
 #[derive(Clone, Debug)]
 pub struct KeyPairG2 {
-    Y: GE1,
-    x: FE1,
+    Y: Point<Bls12_381_1>,
+    x: Scalar<Bls12_381_1>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct BLSSignature {
-    pub sigma: GE2,
+    pub sigma: Point<Bls12_381_2>,
 }
 
 impl KeyPairG2 {
     pub fn new() -> Self {
-        let x: FE1 = FE1::random();
-        let Y = GE1::generator().scalar_mul(&x);
+        let x = Scalar::random();
+        let Y = Point::generator() * &x;
         KeyPairG2 { x, Y }
     }
 
-    pub fn from_hex(sk:&str) -> Result<Self> {
-        let sk:Vec<u8> = hex::decode(sk)?;
+    pub fn from_hex(sk: &str) -> Result<Self> {
+        let sk: Vec<u8> = hex::decode(sk)?;
 
         let sk = BigInt::from_bytes(&sk);
 
-        let x = FE1::from_bigint(&sk);
-        let Y = GE1::generator().scalar_mul(&x);
+        let x = Scalar::from_bigint(&sk);
+        let Y = Point::generator() * &x;
 
-        let keypair = KeyPairG2{
-            x,Y
+        let keypair = KeyPairG2 {
+            x,
+            Y,
         };
         Ok(keypair)
     }
@@ -51,31 +47,28 @@ impl BLSSignature {
     // compute sigma  = x H(m)
     pub fn sign(message: &[u8], keys: &KeyPairG2) -> Self {
         let dst = "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_".as_bytes();
-        let H_m = GE2::hash_to_curve(message, dst);
+        let H_m = Point::<Bls12_381_2>::from_raw(GE2::hash_to_curve(message, dst)).unwrap();
         BLSSignature {
-            sigma: H_m.scalar_mul(&keys.x),
+            sigma: &H_m * &Scalar::from_raw(keys.x.clone().into_raw()),
         }
     }
 
     // check e(H(m), Y) == e(sigma, g2)
-    pub fn verify(&self, message: &[u8], pubkey: &GE1) -> bool {
+    pub fn verify(&self, message: &[u8], pubkey: &Point<Bls12_381_1>) -> bool {
         let dst = "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_".as_bytes();
-        let H_m = GE2::hash_to_curve(message, dst);
+        let H_m = Point::from_raw(GE2::hash_to_curve(message, dst)).unwrap();
+        let neg_one = -Point::generator().to_point();
         let product = Pair::efficient_pairing_mul(
-            &Point::from_raw(pubkey.clone()).unwrap(),
-            &Point::from_raw(H_m).unwrap(),
-            &Point::from_raw(GE1::generator().neg_point()).unwrap(),
-            &Point::from_raw(self.sigma).unwrap()
+            &pubkey,
+            &H_m,
+            &neg_one,
+            &self.sigma,
         );
         product.e.is_identity().into()
     }
 
     pub fn to_bytes(&self, compressed: bool) -> Vec<u8> {
-        if compressed {
-            self.sigma.serialize_compressed().to_vec()
-        } else {
-            self.sigma.serialize_uncompressed().to_vec()
-        }
+        self.sigma.to_bytes(compressed).to_vec()
     }
 }
 
