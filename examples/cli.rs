@@ -2,12 +2,10 @@ use std::net::SocketAddr;
 use std::process::exit;
 
 use anyhow::{anyhow, bail, Context, Result};
-use curv::elliptic::curves::{ECPoint, Point, Scalar};
-use curv_bls12_381::g1::GE1;
-use curv_bls12_381::g2::GE2;
 use structopt::StructOpt;
 use tokio::runtime;
 use tracing::{error, info};
+use bls_eth::types::{PkPoint, SigPoint};
 
 mod cli_args;
 mod mediator;
@@ -167,13 +165,11 @@ fn verify(
     let signature =
         hex::decode(signature).context("signature key is not valid hex encoded string")?;
 
-    let public_key = GE1::deserialize(&public_key)
+    let public_key = PkPoint::from_bytes(&public_key)
         .map_err(|e| anyhow!("public key is not valid g1 point: {:?}", e))?;
-    let signature = GE2::deserialize(&signature)
+    let signature = SigPoint::from_bytes(&signature)
         .map_err(|e| anyhow!("signature is not valid g2 point: {:?}", e))?;
 
-    let public_key = Point::from_raw(public_key)?;
-    let signature = Point::from_raw(signature)?;
     let valid = BLSSignature { sigma: signature }.verify(&digest, &public_key);
     if valid {
         println!("Signature is valid");

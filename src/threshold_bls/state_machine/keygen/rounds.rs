@@ -1,17 +1,12 @@
-use curv::cryptographic_primitives::proofs::sigma_dlog::DLogProof;
-use curv::cryptographic_primitives::secret_sharing::feldman_vss::{ShamirSecretSharing, VerifiableSS};
-use curv::elliptic::curves::{Point, Scalar};
-use curv_bls12_381::Bls12_381_1;
+use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
 use round_based::containers::{self, BroadcastMsgs, P2PMsgs, Store};
 use round_based::containers::push::Push;
 use round_based::Msg;
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
 use thiserror::Error;
 
 use crate::threshold_bls::party_i;
-
-type PkCurve = curv_bls12_381::Bls12_381_1;
+use crate::types::*;
 
 pub struct Round0 {
     pub party_i: u16,
@@ -104,7 +99,7 @@ impl Round2 {
         mut output: O,
     ) -> Result<Round3>
         where
-            O: Push<Msg<(VerifiableSS<PkCurve>, Scalar<PkCurve>)>>,
+            O: Push<Msg<(KeyVss, PkScalar)>>,
     {
         let params = ShamirSecretSharing {
             threshold: self.t.into(),
@@ -152,11 +147,11 @@ impl Round2 {
 pub struct Round3 {
     keys: party_i::Keys,
 
-    y_vec: Vec<Point<Bls12_381_1>>,
+    y_vec: Vec<PkPoint>,
 
     index: u16,
-    own_vss: VerifiableSS<PkCurve>,
-    own_share: Scalar<PkCurve>,
+    own_vss: KeyVss,
+    own_share: PkScalar,
 
     party_i: u16,
     t: u16,
@@ -166,11 +161,11 @@ pub struct Round3 {
 impl Round3 {
     pub fn proceed<O>(
         self,
-        input: P2PMsgs<(VerifiableSS<PkCurve>, Scalar<PkCurve>)>,
+        input: P2PMsgs<(KeyVss, PkScalar)>,
         mut output: O,
     ) -> Result<Round4>
         where
-            O: Push<Msg<DLogProof<PkCurve, Sha256>>>,
+            O: Push<Msg<KeyProof>>,
     {
         let params = ShamirSecretSharing {
             threshold: self.t.into(),
@@ -181,7 +176,7 @@ impl Round3 {
             .into_iter()
             .unzip();
 
-        let y_vec = self.y_vec.iter().map(|y| y.clone()).collect::<Vec<Point<PkCurve>>>();
+        let y_vec = self.y_vec.iter().map(|y| y.clone()).collect::<Vec<PkPoint>>();
         let (shared_keys, dlog_proof) = self
             .keys
             .phase2_verify_vss_construct_keypair_prove_dlog(
@@ -211,14 +206,14 @@ impl Round3 {
     pub fn is_expensive(&self) -> bool {
         true
     }
-    pub fn expects_messages(i: u16, n: u16) -> Store<P2PMsgs<(VerifiableSS<PkCurve>, Scalar<PkCurve>)>> {
+    pub fn expects_messages(i: u16, n: u16) -> Store<P2PMsgs<(KeyVss, PkScalar)>> {
         containers::P2PMsgsStore::new(i, n)
     }
 }
 
 pub struct Round4 {
     shared_keys: party_i::SharedKeys,
-    own_dlog_proof: DLogProof<PkCurve, Sha256>,
+    own_dlog_proof: KeyProof,
 
     party_i: u16,
     t: u16,
@@ -226,7 +221,7 @@ pub struct Round4 {
 }
 
 impl Round4 {
-    pub fn proceed(self, input: BroadcastMsgs<DLogProof<PkCurve, Sha256>>) -> Result<LocalKey> {
+    pub fn proceed(self, input: BroadcastMsgs<KeyProof>) -> Result<LocalKey> {
         let params = ShamirSecretSharing {
             threshold: self.t.into(),
             share_count: self.n.into(),
@@ -247,7 +242,7 @@ impl Round4 {
     pub fn is_expensive(&self) -> bool {
         true
     }
-    pub fn expects_messages(i: u16, n: u16) -> Store<BroadcastMsgs<DLogProof<PkCurve, Sha256>>> {
+    pub fn expects_messages(i: u16, n: u16) -> Store<BroadcastMsgs<KeyProof>> {
         containers::BroadcastMsgsStore::new(i, n)
     }
 }
@@ -256,7 +251,7 @@ impl Round4 {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct LocalKey {
     pub(in crate::threshold_bls::state_machine) shared_keys: party_i::SharedKeys,
-    pub(in crate::threshold_bls::state_machine) vk_vec: Vec<Point<PkCurve>>,
+    pub(in crate::threshold_bls::state_machine) vk_vec: Vec<PkPoint>,
 
     pub(in crate::threshold_bls::state_machine) i: u16,
     pub(in crate::threshold_bls::state_machine) t: u16,
@@ -265,7 +260,7 @@ pub struct LocalKey {
 
 impl LocalKey {
     /// Public key of secret shared between parties
-    pub fn public_key(&self) -> Point<Bls12_381_1> {
+    pub fn public_key(&self) -> PkPoint {
         self.shared_keys.vk.clone()
     }
 }

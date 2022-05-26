@@ -1,9 +1,6 @@
-use curv::elliptic::curves::Point;
-use curv_bls12_381::Bls12_381_1;
-use curv_bls12_381::g1::GE1;
-
-use crate::aggregated_bls::party_i::{APK, Keys};
+use crate::aggregated_bls::party_i::Keys;
 use crate::basic_bls::BLSSignature;
+use crate::types::*;
 
 // test 3 out of 3
 #[test]
@@ -110,14 +107,14 @@ pub fn agg_sig_test_n_batch_m(n: usize, msg_vec: &[&[u8]], bad_m_v: &[&[u8]]) {
     );
 }
 
-fn keygen(n_parties: usize) -> (Vec<Keys>, Vec<Point<Bls12_381_1>>, APK) {
+fn keygen(n_parties: usize) -> (Vec<Keys>, Vec<PkPoint>, PkPoint) {
     let keys_vec: Vec<Keys> = (0..n_parties).map(|i| Keys::new(i)).collect();
-    let pk_vec: Vec<Point<Bls12_381_1>> = keys_vec.iter().map(|x| x.pk_i.clone()).collect();
+    let pk_vec: Vec<PkPoint> = keys_vec.iter().map(|x| x.pk_i.clone()).collect();
     let apk = Keys::aggregate(pk_vec.as_slice());
     (keys_vec, pk_vec, apk)
 }
 
-fn keygen_batch(n_parties: usize, m_batches: usize) -> (Vec<Vec<Keys>>, Vec<Vec<Point<Bls12_381_1>>>, Vec<APK>) {
+fn keygen_batch(n_parties: usize, m_batches: usize) -> (Vec<Vec<Keys>>, Vec<Vec<PkPoint>>, Vec<PkPoint>) {
     let keygen_vec_batch: Vec<_> = (0..m_batches).map(|_| keygen(n_parties)).collect();
     let keys_vec_batch = keygen_vec_batch.iter().map(|x| x.0.clone()).collect();
     let pk_vec_batch = keygen_vec_batch.iter().map(|x| x.1.clone()).collect();
@@ -128,7 +125,7 @@ fn keygen_batch(n_parties: usize, m_batches: usize) -> (Vec<Vec<Keys>>, Vec<Vec<
 fn sign_batch(
     n_parties: usize,
     key_vec: &Vec<Vec<Keys>>,
-    pk_vec: &Vec<Vec<Point<Bls12_381_1>>>,
+    pk_vec: &Vec<Vec<PkPoint>>,
     msg_vec: &[&[u8]],
 ) -> BLSSignature {
     let sig_vec: Vec<Vec<_>> = (0..msg_vec.len())

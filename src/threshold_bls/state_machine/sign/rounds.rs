@@ -1,5 +1,3 @@
-use curv::elliptic::curves::Point;
-use curv_bls12_381::Bls12_381_2;
 use round_based::containers::{self, BroadcastMsgs, Store};
 use round_based::containers::push::Push;
 use round_based::Msg;
@@ -8,6 +6,7 @@ use thiserror::Error;
 use crate::basic_bls::BLSSignature;
 use crate::threshold_bls::party_i;
 use crate::threshold_bls::state_machine::keygen::LocalKey;
+use crate::types::*;
 
 pub struct Round0 {
     pub key: LocalKey,
@@ -41,7 +40,7 @@ impl Round0 {
 
 pub struct Round1 {
     key: LocalKey,
-    message: Point<Bls12_381_2>,
+    message: SigPoint,
 
     partial_sig: party_i::PartialSignature,
 }
@@ -50,7 +49,7 @@ impl Round1 {
     pub fn proceed(
         self,
         input: BroadcastMsgs<(u16, party_i::PartialSignature)>,
-    ) -> Result<(Point<Bls12_381_2>, BLSSignature)> {
+    ) -> Result<(SigPoint, BLSSignature)> {
         let (indexes, sigs): (Vec<_>, Vec<_>) = input
             .into_vec_including_me((self.key.i, self.partial_sig))
             .into_iter()

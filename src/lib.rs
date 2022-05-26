@@ -97,6 +97,7 @@ extern crate core;
 pub mod aggregated_bls;
 pub mod basic_bls;
 pub mod threshold_bls;
+pub mod types;
 
 /// BLS verification should follow the BLS standard:
 /// [https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-04]

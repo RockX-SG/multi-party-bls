@@ -4,8 +4,6 @@ use std::fmt;
 use std::mem::replace;
 use std::time::Duration;
 
-use curv::elliptic::curves::Point;
-use curv_bls12_381::Bls12_381_2;
 use round_based::{IsCritical, Msg, StateMachine};
 use round_based::containers::{
     *,
@@ -21,6 +19,7 @@ pub use rounds::ProceedError;
 use crate::basic_bls::BLSSignature;
 use crate::threshold_bls::party_i;
 use crate::threshold_bls::state_machine::keygen::LocalKey;
+use crate::types::*;
 
 mod rounds;
 
@@ -141,7 +140,7 @@ impl Sign {
 impl StateMachine for Sign {
     type MessageBody = ProtocolMessage;
     type Err = Error;
-    type Output = (Point<Bls12_381_2>, BLSSignature);
+    type Output = (SigPoint, BLSSignature);
 
     fn handle_incoming(&mut self, msg: Msg<Self::MessageBody>) -> Result<()> {
         let current_round = self.current_round();
@@ -321,7 +320,7 @@ impl fmt::Debug for Sign {
 enum R {
     Round0(Round0),
     Round1(Round1),
-    Final((Point<Bls12_381_2>, BLSSignature)),
+    Final((SigPoint, BLSSignature)),
     Gone,
 }
 

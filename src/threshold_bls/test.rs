@@ -1,18 +1,13 @@
 use std::convert::TryInto;
 
-use bls_sigs_ref::BLSSignaturePop;
 use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSharing;
-use curv::elliptic::curves::{ECPoint, ECScalar, Point, Scalar};
-use curv_bls12_381::Bls12_381_1;
-use curv_bls12_381::scalar::FieldScalar;
 
 use crate::basic_bls::BLSSignature;
 use crate::threshold_bls::party_i::Keys;
 use crate::threshold_bls::party_i::SharedKeys;
+use crate::types::*;
 
-type PkCurve = Bls12_381_1;
-type FE1 = FieldScalar;
-type KeygenOutput = (Vec<SharedKeys>, Vec<Point<PkCurve>>);
+type KeygenOutput = (Vec<SharedKeys>, Vec<PkPoint>);
 
 #[test]
 fn test_keygen_t1_n2() {
@@ -70,7 +65,7 @@ pub fn keygen_t_n_parties(t: u16, n: u16) -> KeygenOutput {
 
     let n = n as usize;
     let t = t as usize;
-    let y_vec = (0..n).map(|i| decom_vec[i].y_i.clone()).collect::<Vec<Point<PkCurve>>>();
+    let y_vec = (0..n).map(|i| decom_vec[i].y_i.clone()).collect::<Vec<PkPoint>>();
 
     let mut vss_scheme_vec = Vec::new();
     let mut secret_shares_vec = Vec::new();
@@ -97,9 +92,9 @@ pub fn keygen_t_n_parties(t: u16, n: u16) -> KeygenOutput {
                     let vec_j = &secret_shares_vec[j];
                     vec_j[i].clone()
                 })
-                .collect::<Vec<Scalar<PkCurve>>>()
+                .collect::<Vec<PkScalar>>()
         })
-        .collect::<Vec<Vec<Scalar<PkCurve>>>>();
+        .collect::<Vec<Vec<PkScalar>>>();
 
     let mut shared_keys_vec = Vec::new();
     let mut dlog_proof_vec = Vec::new();
@@ -117,7 +112,7 @@ pub fn keygen_t_n_parties(t: u16, n: u16) -> KeygenOutput {
         dlog_proof_vec.push(dlog_proof);
     }
 
-    let vk_vec = (0..n).map(|i| dlog_proof_vec[i].pk.clone()).collect::<Vec<Point<PkCurve>>>();
+    let vk_vec = (0..n).map(|i| dlog_proof_vec[i].pk.clone()).collect::<Vec<PkPoint>>();
 
     //all parties run:
     Keys::verify_dlog_proofs(&params, &dlog_proof_vec).expect("");
@@ -125,11 +120,11 @@ pub fn keygen_t_n_parties(t: u16, n: u16) -> KeygenOutput {
     //test
     let xi_vec = (0..=t)
         .map(|i| shared_keys_vec[i].sk_i.clone())
-        .collect::<Vec<Scalar<PkCurve>>>();
+        .collect::<Vec<PkScalar>>();
     let x = vss_scheme_vec[0]
         .clone()
         .reconstruct(&index_vec[0..=t], &xi_vec);
-    let sum_u_i = party_keys_vec.iter().fold(Scalar::zero(), |acc, x| acc + &x.u_i);
+    let sum_u_i = party_keys_vec.iter().fold(PkScalar::zero(), |acc, x| acc + &x.u_i);
     assert_eq!(x, sum_u_i);
 
     (shared_keys_vec, vk_vec)
@@ -152,7 +147,7 @@ pub fn sign(
         .collect::<Vec<SharedKeys>>();
     let vk_participating_parties = (0..t_prime)
         .map(|i| vk_vec[s[i] as usize].clone())
-        .collect::<Vec<Point<PkCurve>>>();
+        .collect::<Vec<PkPoint>>();
 
     // each party performs a partial sign
     let (partial_sign_vec, H_x): (Vec<_>, Vec<_>) = shared_keys_participating_parties

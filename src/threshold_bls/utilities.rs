@@ -1,13 +1,11 @@
 use curv::arithmetic::{Modulo, Zero};
 use curv::BigInt;
 use curv::cryptographic_primitives::hashing::{Digest, DigestExt};
-use curv::elliptic::curves::{Point, Scalar};
-use curv::elliptic::curves::ECScalar;
-use curv_bls12_381::{Bls12_381_1, Bls12_381_2};
-use curv_bls12_381::scalar::FieldScalar;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use zeroize::Zeroize;
+
+use crate::types::*;
 
 /// NIZK required for our threshold BLS:
 /// This is a special case of the ec ddh proof from Curv:
@@ -19,17 +17,17 @@ use zeroize::Zeroize;
 /// to standard-unforgeability,as defined in "Threshold Signatures, Multisignatures and Blind Signatures Based on the Gap-Diffie-Hellman-Group Signature Scheme"
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct ECDDHProof {
-    pub a1: Point<Bls12_381_1>,
-    pub a2: Point<Bls12_381_2>,
+    pub a1: PkPoint,
+    pub a2: SigPoint,
     pub z: BigInt,
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct ECDDHStatement {
-    pub g1: Point<Bls12_381_1>,
-    pub h1: Point<Bls12_381_1>,
-    pub g2: Point<Bls12_381_2>,
-    pub h2: Point<Bls12_381_2>,
+    pub g1: PkPoint,
+    pub h1: PkPoint,
+    pub g2: SigPoint,
+    pub h2: SigPoint,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -38,22 +36,23 @@ pub struct ECDDHWitness {
 }
 
 impl ECDDHProof {
-    fn hash_scalar(&self, delta: &ECDDHStatement) -> FieldScalar {
-        Sha256::new()
+    fn hash_scalar(&self, delta: &ECDDHStatement) -> PkScalar {
+        let raw = Sha256::new()
             .chain_point(&delta.g2)
             .chain_point(&delta.h2)
             .chain_point(&delta.g1)
             .chain_point(&delta.h1)
             .chain_point(&self.a1)
             .chain_point(&self.a2)
-            .result_scalar::<Bls12_381_1>().into_raw()
+            .result_scalar::<PkCurve>().into_raw();
+        PkScalar::from_raw(raw)
     }
 
     pub fn prove(w: &ECDDHWitness, delta: &ECDDHStatement) -> ECDDHProof {
-        let s1 = Scalar::random();
+        let s1 = PkScalar::random();
         let a1 = &delta.g1 * &s1; // g1 * s1
         let mut s = s1.to_bigint();
-        let s2 = Scalar::from_bigint(&s);
+        let s2 = SigScalar::from_bigint(&s);
         let a2 = &delta.g2 * &s2; // g2 * s2
 
         let mut my_proof = ECDDHProof {
@@ -64,7 +63,7 @@ impl ECDDHProof {
 
         let e = my_proof.hash_scalar(delta).to_bigint();
         let z = &s + e * &w.x;
-        let z = z.modulus(Scalar::<Bls12_381_1>::group_order());
+        let z = z.modulus(PkScalar::group_order());
         s1.into_raw().zeroize();
         s.zeroize();
         my_proof.z = z;
@@ -72,17 +71,17 @@ impl ECDDHProof {
     }
 
     pub fn verify(&self, delta: &ECDDHStatement) -> bool {
-        if self.z > *Scalar::<Bls12_381_1>::group_order() {
+        if self.z > *PkScalar::group_order() {
             return false;
         }
-        let scalar_z1 = Scalar::from_bigint(&self.z);
-        let scalar_z2 = Scalar::from_bigint(&self.z);
+        let scalar_z1 = PkScalar::from_bigint(&self.z);
+        let scalar_z2 = SigScalar::from_bigint(&self.z);
         let e = self.hash_scalar(delta);
         let z_g1 = &delta.g1 * (&scalar_z1);
         let z_g2 = &delta.g2 * (&scalar_z2);
 
-        let a1_plus_e_h1 = &self.a1 + &delta.h1 * &Scalar::from_raw(e.clone());
-        let a2_plus_e_h2 = &self.a2 + &delta.h2 * &Scalar::from_raw(e);
+        let a1_plus_e_h1 = &self.a1 + &delta.h1 * &e;
+        let a2_plus_e_h2 = &self.a2 + &delta.h2 * &SigScalar::from_bigint(&e.to_bigint());
         z_g1 == a1_plus_e_h1 && z_g2 == a2_plus_e_h2
     }
 }
@@ -90,19 +89,18 @@ impl ECDDHProof {
 #[cfg(test)]
 mod tests {
     use curv::arithmetic::traits::*;
-    use curv::elliptic::curves::{ECPoint, ECScalar};
-    use curv_bls12_381::g2::GE2;
-    use curv_bls12_381::scalar::FieldScalar as FE2;
+
+    use crate::types::*;
 
     use super::*;
 
     #[test]
     fn test_ecddh_proof() {
-        let x1 = Scalar::random();
-        let x2 = Scalar::<Bls12_381_2>::from_bigint(&x1.to_bigint());
+        let x1 = PkScalar::random();
+        let x2 = SigScalar::from_bigint(&x1.to_bigint());
 
-        let g1 = Point::<Bls12_381_1>::base_point2().clone();
-        let g2 = Point::<Bls12_381_2>::generator().to_point();
+        let g1 = PkPoint::base_point2().clone();
+        let g2 = SigPoint::generator().to_point();
 
         let h1 = &g1 * &x1;
         let h2 = &g2 * &x2;
@@ -116,12 +114,12 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_bad_ecddh_proof() {
-        let x1 = Scalar::random();
-        let x2 = Scalar::<Bls12_381_2>::from_bigint(&(x1.to_bigint() + BigInt::one())).into(); // bad
+        let x1 = PkScalar::random();
+        let x2 = SigScalar::from_bigint(&(x1.to_bigint() + BigInt::one())).into(); // bad
 
 
-        let g1 = Point::<Bls12_381_1>::base_point2().clone();
-        let g2 = Point::<Bls12_381_2>::generator().to_point();
+        let g1 = PkPoint::base_point2().clone();
+        let g2 = SigPoint::generator().to_point();
 
         let h1 = &g1 * &x1;
         let h2 = &g2 * &x2;
