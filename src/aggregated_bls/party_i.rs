@@ -1,3 +1,5 @@
+use std::iter::Sum;
+
 use curv::arithmetic::traits::Modulo;
 use curv::BigInt;
 
@@ -27,13 +29,10 @@ impl Keys {
     }
 
     pub fn aggregate(pk_vec: &[PkPoint]) -> PkPoint {
-        let mut apk_plus_g = PkPoint::generator().to_point();
-        for (i, pk) in pk_vec.iter().enumerate() {
-            let pt = pk * &PkScalar::from_bigint(&h1(i, pk_vec));
-            apk_plus_g = apk_plus_g + pt;
-        }
-        apk_plus_g = apk_plus_g - &PkPoint::generator().to_point();
-        apk_plus_g
+        let pk_s = pk_vec.iter().enumerate().map(|(i, pk)| {
+            pk * &PkScalar::from_bigint(&h1(i, pk_vec))
+        });
+        PkPoint::sum(pk_s)
     }
 
     pub fn local_sign(&self, message: &[u8], pk_vec: &[PkPoint]) -> SigPoint {
@@ -46,8 +45,7 @@ impl Keys {
     }
 
     pub fn combine_local_signatures(sigs: &[SigPoint]) -> BLSSignature {
-        let (head, tail) = sigs.split_at(1);
-        let sig_sum = tail.iter().fold(head[0].clone(), |acc, x| acc + x);
+        let sig_sum = SigPoint::sum(sigs.iter());
         BLSSignature { sigma: sig_sum }
     }
 
@@ -56,9 +54,12 @@ impl Keys {
     }
 
     pub fn batch_aggregate_bls(sig_vec: &[BLSSignature]) -> BLSSignature {
-        let (head, tail) = sig_vec.split_at(1);
+        let inner_vec = sig_vec.iter().map(|sig| {
+            &sig.sigma
+        });
+        let sig_sum = SigPoint::sum(inner_vec);
         BLSSignature {
-            sigma: tail.iter().fold(head[0].sigma.clone(), |acc, x| &acc + &x.sigma),
+            sigma: sig_sum,
         }
     }
 

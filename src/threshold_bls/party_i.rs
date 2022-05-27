@@ -1,3 +1,4 @@
+use std::iter::Sum;
 use std::ops::Add;
 
 use curv::arithmetic::traits::*;
@@ -147,15 +148,8 @@ impl Keys {
 
         match correct_ss_verify {
             true => {
-                let (head, tail) = y_vec.split_at(1);
-                let mut y = head[0].clone();
-                for pt in tail.iter() {
-                    y = y.add(pt);
-                }
-                let mut x_i = PkScalar::zero();
-                for x_i_j in secret_shares_vec.iter() {
-                    x_i = &x_i + x_i_j;
-                }
+                let y = PkPoint::sum(y_vec.iter());
+                let x_i = PkScalar::sum(secret_shares_vec.iter());
                 let dlog_proof = KeyProof::prove(&x_i);
                 Ok((
                     SharedKeys {
@@ -253,33 +247,15 @@ impl SharedKeys {
         if partial_sigs_verify == false {
             return Err(Error::PartialSignatureVerificationError);
         }
-
-        let (head, tail) = partial_sigs_vec.split_at(1);
-        let mut sigma = &head[0].sigma_i *
-            &SigVss::map_share_to_new_params(
-                &self.params,
-                head[0].index as u16,
-                &s[0..usize::from(self.params.threshold) + 1],
-            );
-        for sig in tail[0..usize::from(self.params.threshold)].iter() {
-            sigma = &sigma + &sig.sigma_i *
-                &SigVss::map_share_to_new_params(
+        let sigma_s = partial_sigs_vec[0..usize::from(self.params.threshold) + 1].iter()
+            .map(|sig| {
+                &sig.sigma_i * &SigVss::map_share_to_new_params(
                     &self.params,
                     sig.index as u16,
                     &s[0..usize::from(self.params.threshold) + 1],
-                );
-        }
-        // let sigma = tail[0..usize::from(self.params.threshold)].iter().fold(
-        //     &initial,
-        //     |acc:&GE2, x:&PartialSignature| {
-        //         &acc.add_point(&x.sigma_i.scalar_mul(
-        //             &VerifiableSS::<SigCurve>::map_share_to_new_params(
-        //                 &self.params,
-        //                 x.index as u16,
-        //                 &s[0..usize::from(self.params.threshold) + 1],
-        //             ).into_raw()))
-        //     },
-        // );
+                )
+            });
+        let sigma = SigPoint::sum(sigma_s);
 
         return Ok(BLSSignature { sigma });
     }
