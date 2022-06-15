@@ -78,6 +78,10 @@ impl Keygen {
         Ok(state)
     }
 
+    pub fn get_state(&self) -> &R{
+        &self.round
+    }
+
     fn gmap_queue<'a, T, F>(&'a mut self, mut f: F) -> impl Push<Msg<T>> + 'a
         where
             F: FnMut(T) -> M + 'a,
@@ -375,8 +379,8 @@ impl fmt::Debug for Keygen {
 }
 
 // Rounds
-
-enum R {
+#[derive(Serialize, Deserialize)]
+pub enum R {
     Round0(Round0),
     Round1(Round1),
     Round2(Round2),

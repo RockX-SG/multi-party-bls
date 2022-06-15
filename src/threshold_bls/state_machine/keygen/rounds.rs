@@ -8,6 +8,7 @@ use thiserror::Error;
 use crate::threshold_bls::party_i;
 use crate::types::*;
 
+#[derive(Serialize, Deserialize)]
 pub struct Round0 {
     pub party_i: u16,
     pub t: u16,
@@ -40,6 +41,7 @@ impl Round0 {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Round1 {
     keys: party_i::Keys,
     comm: party_i::KeyGenComm,
@@ -82,6 +84,7 @@ impl Round1 {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Round2 {
     keys: party_i::Keys,
     received_comm: Vec<party_i::KeyGenComm>,
@@ -144,6 +147,7 @@ impl Round2 {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Round3 {
     keys: party_i::Keys,
 
@@ -211,6 +215,7 @@ impl Round3 {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Round4 {
     shared_keys: party_i::SharedKeys,
     own_dlog_proof: KeyProof,

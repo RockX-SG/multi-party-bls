@@ -29,7 +29,7 @@ const SECURITY: usize = 256;
 /// We removed the RSA modulus generation from the DKG as this is unrelated to threshold BLS and do not affect the security proof.
 /// We note that the DKG can probably be biased to some extent, however, we do not find it concerning
 /// for the threshold BLS application.
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct Keys {
     pub u_i: PkScalar,
     pub y_i: PkPoint,
