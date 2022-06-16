@@ -244,7 +244,7 @@ pub struct Round4 {
 }
 
 impl Round4 {
-    pub fn proceed(self, input: BroadcastMsgs<KeyProof>) -> Result<LocalKey> {
+    pub fn proceed(self, input: BroadcastMsgs<KeyProof>) -> Result<party_i::LocalKey> {
         let params = ShamirSecretSharing {
             threshold: self.t.into(),
             share_count: self.n.into(),
@@ -253,7 +253,7 @@ impl Round4 {
         party_i::Keys::verify_dlog_proofs(&params, &dlog_proofs)
             .map_err(ProceedError::Round4VerifyDLogProof)?;
         let vk_vec = dlog_proofs.into_iter().map(|p| p.pk).collect();
-        Ok(LocalKey {
+        Ok(party_i::LocalKey {
             shared_key: self.shared_keys,
             vk_vec,
         })
@@ -263,20 +263,6 @@ impl Round4 {
     }
     pub fn expects_messages(i: u16, n: u16) -> Store<BroadcastMsgs<KeyProof>> {
         containers::BroadcastMsgsStore::new(i, n)
-    }
-}
-
-/// Local secret obtained by party after [keygen](super::Keygen) protocol is completed
-#[derive(Clone, Serialize, Deserialize)]
-pub struct LocalKey {
-    pub(in crate::threshold_bls::state_machine) shared_key: party_i::SharedKey,
-    pub(in crate::threshold_bls::state_machine) vk_vec: Vec<PkPoint>,
-}
-
-impl LocalKey {
-    /// Public key of secret shared between parties
-    pub fn public_key(&self) -> PkPoint {
-        self.shared_key.vk.clone()
     }
 }
 

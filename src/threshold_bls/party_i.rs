@@ -67,6 +67,13 @@ pub struct SharedKey {
     pub sk_i: PkScalar,
 }
 
+/// Local secret obtained by party after [keygen](super::Keygen) protocol is completed
+#[derive(Clone, Serialize, Deserialize)]
+pub struct LocalKey {
+    pub shared_key: SharedKey,
+    pub vk_vec: Vec<PkPoint>,
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct PartialSignature {
     pub i: u16,
@@ -280,5 +287,12 @@ impl SharedKey {
     // check e(H(m), vk) == e(sigma, g2)
     pub fn verify(&self, sig: &BLSSignature, x: &[u8]) -> bool {
         sig.verify(x, &self.vk)
+    }
+}
+
+impl LocalKey {
+    /// Public key of secret shared between parties
+    pub fn public_key(&self) -> PkPoint {
+        self.shared_key.vk.clone()
     }
 }

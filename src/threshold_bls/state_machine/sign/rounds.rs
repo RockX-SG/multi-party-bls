@@ -5,11 +5,10 @@ use thiserror::Error;
 
 use crate::basic_bls::BLSSignature;
 use crate::threshold_bls::party_i;
-use crate::threshold_bls::state_machine::keygen::LocalKey;
 use crate::types::*;
 
 pub struct Round0 {
-    pub key: LocalKey,
+    pub key: party_i::LocalKey,
     pub message: Vec<u8>,
 
     pub i: u16,
@@ -39,7 +38,7 @@ impl Round0 {
 }
 
 pub struct Round1 {
-    key: LocalKey,
+    key: party_i::LocalKey,
     message: SigPoint,
 
     partial_sig: party_i::PartialSignature,

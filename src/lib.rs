@@ -53,7 +53,7 @@
 //! ### Sign
 //! ```no_run
 //! use round_based::{Msg, AsyncProtocol};
-//! # use bls_eth::threshold_bls::state_machine::keygen::LocalKey;
+//! # use bls_eth::threshold_bls::party_i::LocalKey;
 //! use bls_eth::threshold_bls::state_machine::sign::{Sign, ProtocolMessage};
 //!
 //! # use std::convert::Infallible;

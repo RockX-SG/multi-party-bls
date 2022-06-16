@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use private::InternalError;
-pub use rounds::{LocalKey, ProceedError};
+pub use rounds::ProceedError;
 use rounds::{Round0, Round1, Round2, Round3, Round4};
 
 use crate::threshold_bls::party_i;
@@ -188,7 +188,7 @@ impl Keygen {
 impl StateMachine for Keygen {
     type MessageBody = ProtocolMessage;
     type Err = Error;
-    type Output = LocalKey;
+    type Output = party_i::LocalKey;
 
     fn handle_incoming(&mut self, msg: Msg<Self::MessageBody>) -> Result<()> {
         let current_round = self.current_round();
@@ -386,7 +386,7 @@ pub enum R {
     Round2(Round2),
     Round3(Round3),
     Round4(Round4),
-    Final(LocalKey),
+    Final(party_i::LocalKey),
     Gone,
 }
 
@@ -476,7 +476,7 @@ mod test {
 
     use super::*;
 
-    fn simulate_keygen(t: u16, n: u16) -> Vec<LocalKey> {
+    fn simulate_keygen(t: u16, n: u16) -> Vec<party_i::LocalKey> {
         let mut simulation = Simulation::new();
         simulation.enable_benchmarks(true);
 

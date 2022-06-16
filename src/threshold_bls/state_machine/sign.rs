@@ -18,7 +18,6 @@ pub use rounds::ProceedError;
 
 use crate::basic_bls::BLSSignature;
 use crate::threshold_bls::party_i;
-use crate::threshold_bls::state_machine::keygen::LocalKey;
 use crate::types::*;
 
 mod rounds;
@@ -50,7 +49,7 @@ impl Sign {
     /// * `n` more than number of parties holding a key (who took a part in keygen),
     ///   returns [Error::TooManyParties]
     /// * `i` is not in range `[1; n]`, returns [Error::InvalidPartyIndex]
-    pub fn new(message: Vec<u8>, i: u16, n: u16, local_key: LocalKey) -> Result<Self> {
+    pub fn new(message: Vec<u8>, i: u16, n: u16, local_key: party_i::LocalKey) -> Result<Self> {
         if n < local_key.shared_key.t + 1 {
             return Err(Error::TooFewParties);
         }
