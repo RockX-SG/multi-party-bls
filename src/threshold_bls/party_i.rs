@@ -33,7 +33,7 @@ const SECURITY: usize = 256;
 pub struct Keys {
     pub u_i: PkScalar,
     pub y_i: PkPoint,
-    pub party_index: u16,
+    pub i: u16,
 }
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -49,7 +49,7 @@ pub struct KeyGenDecom {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SharedKeys {
-    pub index: u16,
+    pub i: u16,
     pub params: ShamirSecretSharing,
     pub vk: PkPoint,
     pub sk_i: PkScalar,
@@ -57,7 +57,7 @@ pub struct SharedKeys {
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct PartialSignature {
-    pub index: u16,
+    pub i: u16,
     pub sigma_i: SigPoint,
     pub ddh_proof: ECDDHProof,
 }
@@ -68,21 +68,21 @@ pub struct Signature {
 }
 
 impl Keys {
-    pub fn phase1_create(index: u16) -> Keys {
+    pub fn phase1_create(i: u16) -> Keys {
         let u = PkScalar::random();
         let y = PkPoint::generator() * &u;
 
         Keys {
             u_i: u,
             y_i: y,
-            party_index: index,
+            i: i,
         }
     }
 
     pub fn phase1_broadcast(&self) -> (KeyGenComm, KeyGenDecom) {
         let blind_factor = BigInt::sample(SECURITY);
         let com = HashCommitment::<Sha256>::create_commitment_with_user_defined_randomness(
-            &(BigInt::from_bytes(&self.y_i.to_bytes(true)[..]) + BigInt::from(self.party_index as u32)), // we add context to the hash function
+            &(BigInt::from_bytes(&self.y_i.to_bytes(true)[..]) + BigInt::from(self.i as u32)), // we add context to the hash function
             &blind_factor,
         );
         let bcm1 = KeyGenComm { com };
@@ -107,7 +107,7 @@ impl Keys {
         let correct_key_correct_decom_all = (0..bc1_vec.len())
             .map(|i| {
                 HashCommitment::<Sha256>::create_commitment_with_user_defined_randomness(
-                    &(BigInt::from_bytes(&decom_vec[i].y_i.to_bytes(true)[..]) + BigInt::from(i as u32)),
+                    &(BigInt::from_bytes(&decom_vec[i].y_i.to_bytes(true)[..]) + BigInt::from(i as u32 + 1)),
                     &decom_vec[i].blind_factor,
                 ) == bc1_vec[i].com
             })
@@ -117,7 +117,7 @@ impl Keys {
             KeyVss::share(params.threshold, params.share_count, &self.u_i);
 
         match correct_key_correct_decom_all {
-            true => Ok((vss_scheme, secret_shares, self.party_index.clone())),
+            true => Ok((vss_scheme, secret_shares, self.i.clone() - 1)),
             false => Err(Error::KeyGenBadCommitment),
         }
     }
@@ -153,7 +153,7 @@ impl Keys {
                 let dlog_proof = KeyProof::prove(&x_i);
                 Ok((
                     SharedKeys {
-                        index: self.party_index,
+                        i: self.i,
                         params: params.clone(),
                         vk: y,
                         sk_i: x_i,
@@ -208,7 +208,7 @@ impl SharedKeys {
 
         (
             PartialSignature {
-                index: self.index,
+                i: self.i,
                 sigma_i,
                 ddh_proof,
             },
@@ -251,7 +251,7 @@ impl SharedKeys {
             .map(|sig| {
                 &sig.sigma_i * &SigVss::map_share_to_new_params(
                     &self.params,
-                    sig.index as u16,
+                    sig.i as u16 - 1,
                     &s[0..usize::from(self.params.threshold) + 1],
                 )
             });

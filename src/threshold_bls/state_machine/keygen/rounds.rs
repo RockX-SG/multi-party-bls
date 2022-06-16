@@ -20,7 +20,7 @@ impl Round0 {
         where
             O: Push<Msg<party_i::KeyGenComm>>,
     {
-        let keys = party_i::Keys::phase1_create(self.party_i - 1);
+        let keys = party_i::Keys::phase1_create(self.party_i);
         let (comm, decom) = keys.phase1_broadcast();
         output.push(Msg {
             sender: self.party_i,

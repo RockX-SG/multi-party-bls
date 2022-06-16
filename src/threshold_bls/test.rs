@@ -55,7 +55,7 @@ pub fn keygen_t_n_parties(t: u16, n: u16) -> KeygenOutput {
         share_count: n,
     };
     let party_keys_vec = (0..n)
-        .map(|i| Keys::phase1_create(i))
+        .map(|i| Keys::phase1_create(i + 1))
         .collect::<Vec<Keys>>();
 
     let (bc1_vec, decom_vec): (Vec<_>, Vec<_>) =
