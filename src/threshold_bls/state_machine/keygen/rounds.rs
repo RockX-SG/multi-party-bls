@@ -109,7 +109,7 @@ impl Round2 {
             share_count: self.n.into(),
         };
         let received_decom = input.into_vec_including_me(self.decom);
-        let (vss_scheme, secret_shares, index) = self
+        let (vss_scheme, secret_shares, _) = self
             .keys
             .phase1_verify_com_phase2_distribute(&params, &received_decom, &self.received_comm)
             .map_err(ProceedError::Round2VerifyCommitments)?;

@@ -1,5 +1,4 @@
 use std::iter::Sum;
-use std::ops::Add;
 
 use curv::arithmetic::traits::*;
 use curv::BigInt;
