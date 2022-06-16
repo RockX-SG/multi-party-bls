@@ -1,7 +1,7 @@
 [package]
 name = "bls-eth"
-version = "0.2.6"
-authors = ["Doron <doronz@zengo.com>", "Omer <omer@zengo.com>", "Denis <dsurv@yandex.ru>"]
+version = "0.3.0"
+authors = ["Doron <doronz@zengo.com>", "Omer <omer@zengo.com>", "Denis <dsurv@yandex.ru>", "Guanglei <guanglei@rockx.com>"]
 description = "threshold BLS library"
 edition = "2018"
 
