@@ -128,7 +128,7 @@ impl Keys {
         y_vec: &Vec<PkPoint>,
         secret_shares_vec: &Vec<PkScalar>,
         vss_scheme_vec: &Vec<KeyVss>,
-        index: &u16,
+        party_i: &u16,
     ) -> Result<(SharedKeys, KeyProof), Error> {
         if y_vec.len() != params.share_count as usize
             || secret_shares_vec.len() != params.share_count as usize
@@ -140,7 +140,7 @@ impl Keys {
         let correct_ss_verify = (0..y_vec.len())
             .map(|i| {
                 vss_scheme_vec[i]
-                    .validate_share(&secret_shares_vec[i], *index)
+                    .validate_share(&secret_shares_vec[i], *party_i)
                     .is_ok()
                     && vss_scheme_vec[i].commitments[0].clone() == y_vec[i]
             })
