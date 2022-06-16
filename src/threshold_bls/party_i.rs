@@ -59,7 +59,7 @@ pub struct KeyShare {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct SharedKeys {
+pub struct SharedKey {
     pub i: u16,
     pub t: u16,
     pub n: u16,
@@ -141,7 +141,7 @@ impl Keys {
         secret_shares_vec: &Vec<PkScalar>,
         vss_scheme_vec: &Vec<KeyVss>,
         party_i: &u16,
-    ) -> Result<(SharedKeys, KeyProof), Error> {
+    ) -> Result<(SharedKey, KeyProof), Error> {
         if y_vec.len() != params.share_count as usize
             || secret_shares_vec.len() != params.share_count as usize
             || vss_scheme_vec.len() != params.share_count as usize
@@ -164,7 +164,7 @@ impl Keys {
                 let x_i = PkScalar::sum(secret_shares_vec.iter());
                 let dlog_proof = KeyProof::prove(&x_i);
                 Ok((
-                    SharedKeys {
+                    SharedKey {
                         i: self.i,
                         t: params.threshold,
                         n: params.share_count,
@@ -197,7 +197,7 @@ impl Keys {
     }
 }
 
-impl SharedKeys {
+impl SharedKey {
     pub fn get_shared_pubkey(&self) -> PkPoint {
         PkPoint::generator().to_point() * &self.sk_i
     }

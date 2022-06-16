@@ -2,10 +2,10 @@ use curv::cryptographic_primitives::secret_sharing::feldman_vss::ShamirSecretSha
 
 use crate::basic_bls::BLSSignature;
 use crate::threshold_bls::party_i::Keys;
-use crate::threshold_bls::party_i::SharedKeys;
+use crate::threshold_bls::party_i::SharedKey;
 use crate::types::*;
 
-type KeygenOutput = (Vec<SharedKeys>, Vec<PkPoint>);
+type KeygenOutput = (Vec<SharedKey>, Vec<PkPoint>);
 
 #[test]
 fn test_keygen_t1_n2() {
@@ -142,7 +142,7 @@ pub fn sign(
     //carry on signing with shared keys of indices from s
     let shared_keys_participating_parties = (0..t_prime)
         .map(|i| shared_keys_vec[s[i] as usize].clone())
-        .collect::<Vec<SharedKeys>>();
+        .collect::<Vec<SharedKey>>();
     let vk_participating_parties = (0..t_prime)
         .map(|i| vk_vec[s[i] as usize].clone())
         .collect::<Vec<PkPoint>>();

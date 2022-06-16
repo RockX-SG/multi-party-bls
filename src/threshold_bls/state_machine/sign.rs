@@ -51,10 +51,10 @@ impl Sign {
     ///   returns [Error::TooManyParties]
     /// * `i` is not in range `[1; n]`, returns [Error::InvalidPartyIndex]
     pub fn new(message: Vec<u8>, i: u16, n: u16, local_key: LocalKey) -> Result<Self> {
-        if n < local_key.t + 1 {
+        if n < local_key.shared_key.t + 1 {
             return Err(Error::TooFewParties);
         }
-        if n > local_key.n {
+        if n > local_key.shared_key.n {
             return Err(Error::TooManyParties);
         }
         if i == 0 || i > n {
@@ -372,7 +372,7 @@ mod test {
         let first = sigs[0].clone();
         assert!(sigs.iter().all(|item| *item == first));
         // test the signatures pass verification
-        assert!(parties_keys[0].shared_keys.verify(&sigs[0], msg));
+        assert!(parties_keys[0].shared_key.verify(&sigs[0], msg));
 
         println!("Benchmarks:");
         println!("{:#?}", sign_simulation.benchmark_results().unwrap());

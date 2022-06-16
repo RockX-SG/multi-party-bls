@@ -235,7 +235,7 @@ impl Round3 {
 
 #[derive(Serialize, Deserialize)]
 pub struct Round4 {
-    shared_keys: party_i::SharedKeys,
+    shared_keys: party_i::SharedKey,
     own_dlog_proof: KeyProof,
 
     party_i: u16,
@@ -254,12 +254,8 @@ impl Round4 {
             .map_err(ProceedError::Round4VerifyDLogProof)?;
         let vk_vec = dlog_proofs.into_iter().map(|p| p.pk).collect();
         Ok(LocalKey {
-            shared_keys: self.shared_keys,
+            shared_key: self.shared_keys,
             vk_vec,
-
-            i: self.party_i,
-            t: self.t,
-            n: self.n,
         })
     }
     pub fn is_expensive(&self) -> bool {
@@ -273,18 +269,14 @@ impl Round4 {
 /// Local secret obtained by party after [keygen](super::Keygen) protocol is completed
 #[derive(Clone, Serialize, Deserialize)]
 pub struct LocalKey {
-    pub(in crate::threshold_bls::state_machine) shared_keys: party_i::SharedKeys,
+    pub(in crate::threshold_bls::state_machine) shared_key: party_i::SharedKey,
     pub(in crate::threshold_bls::state_machine) vk_vec: Vec<PkPoint>,
-
-    pub(in crate::threshold_bls::state_machine) i: u16,
-    pub(in crate::threshold_bls::state_machine) t: u16,
-    pub(in crate::threshold_bls::state_machine) n: u16,
 }
 
 impl LocalKey {
     /// Public key of secret shared between parties
     pub fn public_key(&self) -> PkPoint {
-        self.shared_keys.vk.clone()
+        self.shared_key.vk.clone()
     }
 }
 

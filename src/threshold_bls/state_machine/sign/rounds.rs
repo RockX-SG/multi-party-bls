@@ -21,7 +21,7 @@ impl Round0 {
         where
             O: Push<Msg<party_i::PartialSignature>>,
     {
-        let (partial_sig, H_x) = self.key.shared_keys.partial_sign(&self.message);
+        let (partial_sig, H_x) = self.key.shared_key.partial_sign(&self.message);
         output.push(Msg {
             sender: self.i,
             receiver: None,
@@ -55,7 +55,7 @@ impl Round1 {
 
         let mut vk_vec = vec![];
         for (party_i, sig) in sigs.iter().enumerate() {
-            if sig.i == 0 || sig.i > self.key.n {
+            if sig.i == 0 || sig.i > self.key.shared_key.n {
                 return Err(ProceedError::PartySentOutOfRangeIndex {
                     who: party_i as u16 + 1,
                     claimed_index: sig.i,
@@ -66,7 +66,7 @@ impl Round1 {
 
         let sig = self
             .key
-            .shared_keys
+            .shared_key
             .combine(vk_vec.as_slice(), &sigs, &self.message)
             .map_err(ProceedError::PartialSignatureVerification)?;
         Ok((self.message, sig))
