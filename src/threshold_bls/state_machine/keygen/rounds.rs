@@ -102,7 +102,7 @@ impl Round2 {
         mut output: O,
     ) -> Result<Round3>
         where
-            O: Push<Msg<(KeyVss, PkScalar)>>,
+            O: Push<Msg<party_i::KeyShare>>,
     {
         let params = ShamirSecretSharing {
             threshold: self.t.into(),
@@ -113,15 +113,22 @@ impl Round2 {
             .keys
             .phase1_verify_com_phase2_distribute(&params, &received_decom, &self.received_comm)
             .map_err(ProceedError::Round2VerifyCommitments)?;
-        for (i, share) in secret_shares.iter().enumerate() {
-            if i + 1 == usize::from(self.party_i) {
+        for (j, share) in secret_shares.iter().enumerate() {
+            if j + 1 == usize::from(self.party_i) {
                 continue;
             }
 
             output.push(Msg {
                 sender: self.party_i,
-                receiver: Some(i as u16 + 1),
-                body: (vss_scheme.clone(), share.clone()),
+                receiver: Some(j as u16 + 1),
+                body: party_i::KeyShare{
+                    i: self.party_i,
+                    t: self.t,
+                    n: self.n,
+                    j: j as u16 + 1,
+                    commitments: vss_scheme.commitments.clone(),
+                    share: share.clone()
+                },
             })
         }
 
@@ -129,9 +136,14 @@ impl Round2 {
             keys: self.keys,
 
             y_vec: received_decom.into_iter().map(|d| d.y_i).collect(),
-
-            own_vss: vss_scheme,
-            own_share: secret_shares[usize::from(self.party_i - 1)].clone(),
+            own_share: party_i::KeyShare{
+                i: self.party_i,
+                t: self.t,
+                n: self.n,
+                j: self.party_i,
+                commitments: vss_scheme.commitments,
+                share: secret_shares[usize::from(self.party_i - 1)].clone(),
+            },
 
             party_i: self.party_i,
             t: self.t,
@@ -152,8 +164,7 @@ pub struct Round3 {
 
     y_vec: Vec<PkPoint>,
 
-    own_vss: KeyVss,
-    own_share: PkScalar,
+    own_share: party_i::KeyShare,
 
     party_i: u16,
     t: u16,
@@ -163,7 +174,7 @@ pub struct Round3 {
 impl Round3 {
     pub fn proceed<O>(
         self,
-        input: P2PMsgs<(KeyVss, PkScalar)>,
+        input: P2PMsgs<party_i::KeyShare>,
         mut output: O,
     ) -> Result<Round4>
         where
@@ -174,8 +185,17 @@ impl Round3 {
             share_count: self.n.into(),
         };
         let (vss_schemes, party_shares): (Vec<_>, Vec<_>) = input
-            .into_vec_including_me((self.own_vss, self.own_share))
+            .into_vec_including_me(self.own_share)
             .into_iter()
+            .map(
+                |s|{
+                    let scheme = KeyVss{
+                        parameters: params.clone(),
+                        commitments: s.commitments.clone(),
+                    };
+                    (scheme, s.share)
+                }
+            )
             .unzip();
 
         let y_vec = self.y_vec.iter().map(|y| y.clone()).collect::<Vec<PkPoint>>();
@@ -208,7 +228,7 @@ impl Round3 {
     pub fn is_expensive(&self) -> bool {
         true
     }
-    pub fn expects_messages(i: u16, n: u16) -> Store<P2PMsgs<(KeyVss, PkScalar)>> {
+    pub fn expects_messages(i: u16, n: u16) -> Store<P2PMsgs<party_i::KeyShare>> {
         containers::P2PMsgsStore::new(i, n)
     }
 }

@@ -30,7 +30,7 @@ pub struct Keygen {
 
     msgs1: Option<Store<BroadcastMsgs<party_i::KeyGenComm>>>,
     msgs2: Option<Store<BroadcastMsgs<party_i::KeyGenDecom>>>,
-    msgs3: Option<Store<P2PMsgs<(KeyVss, PkScalar)>>>,
+    msgs3: Option<Store<P2PMsgs<party_i::KeyShare>>>,
     msgs4: Option<Store<BroadcastMsgs<KeyProof>>>,
 
     msgs_queue: Vec<Msg<ProtocolMessage>>,
@@ -402,7 +402,7 @@ pub struct ProtocolMessage(M);
 enum M {
     Round1(party_i::KeyGenComm),
     Round2(party_i::KeyGenDecom),
-    Round3((KeyVss, PkScalar)),
+    Round3(party_i::KeyShare),
     Round4(KeyProof),
 }
 

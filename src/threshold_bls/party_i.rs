@@ -47,10 +47,22 @@ pub struct KeyGenDecom {
     pub y_i: PkPoint,
 }
 
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[serde(bound = "")]
+pub struct KeyShare {
+    pub i: u16,
+    pub t: u16,
+    pub n: u16,
+    pub j: u16,
+    pub commitments: Vec<PkPoint>,
+    pub share: PkScalar,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SharedKeys {
     pub i: u16,
-    pub params: ShamirSecretSharing,
+    pub t: u16,
+    pub n: u16,
     pub vk: PkPoint,
     pub sk_i: PkScalar,
 }
@@ -154,7 +166,8 @@ impl Keys {
                 Ok((
                     SharedKeys {
                         i: self.i,
-                        params: params.clone(),
+                        t: params.threshold,
+                        n: params.share_count,
                         vk: y,
                         sk_i: x_i,
                     },
@@ -224,9 +237,9 @@ impl SharedKeys {
         s: &[u16],
     ) -> Result<BLSSignature, Error> {
         if vk_vec.len() != partial_sigs_vec.len()
-            || vk_vec.len() < self.params.threshold as usize
-            || s.len() < self.params.threshold as usize
-            || s.len() > self.params.share_count as usize
+            || vk_vec.len() < self.t as usize
+            || s.len() < self.t as usize
+            || s.len() > self.n as usize
         {
             return Err(Error::SigningMisMatchedVectors);
         }
@@ -247,12 +260,16 @@ impl SharedKeys {
         if partial_sigs_verify == false {
             return Err(Error::PartialSignatureVerificationError);
         }
-        let sigma_s = partial_sigs_vec[0..usize::from(self.params.threshold) + 1].iter()
+        let params = ShamirSecretSharing {
+            threshold: self.t,
+            share_count: self.n,
+        };
+        let sigma_s = partial_sigs_vec[0..usize::from(self.t) + 1].iter()
             .map(|sig| {
                 &sig.sigma_i * &SigVss::map_share_to_new_params(
-                    &self.params,
+                    &params,
                     sig.i as u16 - 1,
-                    &s[0..usize::from(self.params.threshold) + 1],
+                    &s[0..usize::from(self.t) + 1],
                 )
             });
         let sigma = SigPoint::sum(sigma_s);
