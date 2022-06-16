@@ -30,7 +30,7 @@ mod rounds;
 pub struct Sign {
     round: R,
 
-    msgs1: Option<Store<BroadcastMsgs<(u16, party_i::PartialSignature)>>>,
+    msgs1: Option<Store<BroadcastMsgs<party_i::PartialSignature>>>,
 
     msgs_queue: Vec<Msg<ProtocolMessage>>,
 
@@ -334,7 +334,7 @@ pub struct ProtocolMessage(M);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 enum M {
-    Round1((u16, party_i::PartialSignature)),
+    Round1(party_i::PartialSignature),
 }
 
 #[cfg(test)]

@@ -19,13 +19,13 @@ pub struct Round0 {
 impl Round0 {
     pub fn proceed<O>(self, mut output: O) -> Result<Round1>
         where
-            O: Push<Msg<(u16, party_i::PartialSignature)>>,
+            O: Push<Msg<party_i::PartialSignature>>,
     {
         let (partial_sig, H_x) = self.key.shared_keys.partial_sign(&self.message);
         output.push(Msg {
             sender: self.i,
             receiver: None,
-            body: (self.key.i, partial_sig.clone()),
+            body: partial_sig.clone(),
         });
         Ok(Round1 {
             key: self.key,
@@ -48,29 +48,26 @@ pub struct Round1 {
 impl Round1 {
     pub fn proceed(
         self,
-        input: BroadcastMsgs<(u16, party_i::PartialSignature)>,
+        input: BroadcastMsgs<party_i::PartialSignature>,
     ) -> Result<(SigPoint, BLSSignature)> {
-        let (indexes, sigs): (Vec<_>, Vec<_>) = input
-            .into_vec_including_me((self.key.i, self.partial_sig))
-            .into_iter()
-            .unzip();
+        let  sigs= input
+            .into_vec_including_me(self.partial_sig);
 
         let mut vk_vec = vec![];
-        for (party_i, &keygen_i) in indexes.iter().enumerate() {
-            if keygen_i == 0 || keygen_i > self.key.n {
+        for (party_i, sig) in sigs.iter().enumerate() {
+            if sig.i == 0 || sig.i > self.key.n {
                 return Err(ProceedError::PartySentOutOfRangeIndex {
                     who: party_i as u16 + 1,
-                    claimed_index: keygen_i,
+                    claimed_index: sig.i,
                 });
             }
-            vk_vec.push(self.key.vk_vec[usize::from(keygen_i) - 1].clone())
+            vk_vec.push(self.key.vk_vec[usize::from(sig.i) - 1].clone())
         }
 
-        let indexes: Vec<_> = indexes.into_iter().map(|i| i - 1).collect();
         let sig = self
             .key
             .shared_keys
-            .combine(vk_vec.as_slice(), &sigs, &self.message, &indexes)
+            .combine(vk_vec.as_slice(), &sigs, &self.message)
             .map_err(ProceedError::PartialSignatureVerification)?;
         Ok((self.message, sig))
     }
@@ -80,7 +77,7 @@ impl Round1 {
     pub fn expects_messages(
         i: u16,
         n: u16,
-    ) -> Store<BroadcastMsgs<(u16, party_i::PartialSignature)>> {
+    ) -> Store<BroadcastMsgs<party_i::PartialSignature>> {
         containers::BroadcastMsgsStore::new(i, n)
     }
 }

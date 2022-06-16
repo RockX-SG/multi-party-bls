@@ -234,12 +234,11 @@ impl SharedKeys {
         vk_vec: &[PkPoint],
         partial_sigs_vec: &[PartialSignature],
         H_x: &SigPoint,
-        s: &[u16],
     ) -> Result<BLSSignature, Error> {
         if vk_vec.len() != partial_sigs_vec.len()
             || vk_vec.len() < self.t as usize
-            || s.len() < self.t as usize
-            || s.len() > self.n as usize
+            || partial_sigs_vec.len() < self.t as usize
+            || partial_sigs_vec.len() > self.n as usize
         {
             return Err(Error::SigningMisMatchedVectors);
         }
@@ -264,12 +263,13 @@ impl SharedKeys {
             threshold: self.t,
             share_count: self.n,
         };
+        let indices = partial_sigs_vec[0..usize::from(self.t) + 1].iter().map(|s| s.i - 1).collect::<Vec<u16>>();
         let sigma_s = partial_sigs_vec[0..usize::from(self.t) + 1].iter()
             .map(|sig| {
                 &sig.sigma_i * &SigVss::map_share_to_new_params(
                     &params,
                     sig.i as u16 - 1,
-                    &s[0..usize::from(self.t) + 1],
+                    &indices,
                 )
             });
         let sigma = SigPoint::sum(sigma_s);

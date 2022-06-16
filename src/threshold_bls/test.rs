@@ -161,7 +161,6 @@ pub fn sign(
                 &vk_participating_parties[..],
                 &partial_sign_vec[..],
                 &H_x[0],
-                s,
             )
                 .expect("")
         })
