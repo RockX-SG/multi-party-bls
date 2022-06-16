@@ -130,7 +130,6 @@ impl Round2 {
 
             y_vec: received_decom.into_iter().map(|d| d.y_i).collect(),
 
-            index,
             own_vss: vss_scheme,
             own_share: secret_shares[usize::from(self.party_i - 1)].clone(),
 
@@ -153,7 +152,6 @@ pub struct Round3 {
 
     y_vec: Vec<PkPoint>,
 
-    index: u16,
     own_vss: KeyVss,
     own_share: PkScalar,
 
@@ -188,7 +186,7 @@ impl Round3 {
                 &y_vec,
                 &party_shares,
                 &vss_schemes,
-                &(self.index + 1),
+                &self.party_i
             )
             .map_err(ProceedError::Round3VerifyVssConstruct)?;
 
