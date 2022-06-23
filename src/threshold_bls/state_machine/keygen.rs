@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use private::InternalError;
-pub use rounds::ProceedError;
 use rounds::{Round0, Round1, Round2, Round3, Round4};
+pub use rounds::ProceedError;
 
 use crate::threshold_bls::party_i;
 use crate::types::*;
@@ -37,6 +37,47 @@ pub struct Keygen {
 
     party_i: u16,
     party_n: u16,
+}
+
+impl From<R> for Keygen {
+    fn from(round: R) -> Self {
+        let (party_i, party_n) = match round {
+            R::Round0(ref r) => {
+                (r.party_i, r.n)
+            }
+            R::Round1(ref r) => {
+                (r.party_i, r.n)
+            }
+            R::Round2(ref r) => {
+                (r.party_i, r.n)
+            }
+            R::Round3(ref r) => {
+                (r.party_i, r.n)
+            }
+            R::Round4(ref r) => {
+                (r.party_i, r.n)
+            }
+            R::Final(_) => {
+                (0, 0)
+            }
+            R::Gone => {
+                (0, 0)
+            }
+        };
+        Self {
+            round,
+
+            msgs1: Some(Round1::expects_messages(party_i, party_n)),
+            msgs2: Some(Round2::expects_messages(party_i, party_n)),
+            msgs3: Some(Round3::expects_messages(party_i, party_n)),
+            msgs4: Some(Round4::expects_messages(party_i, party_n)),
+
+            msgs_queue: vec![],
+
+            party_i,
+            party_n,
+        }
+    }
 }
 
 impl Keygen {
@@ -78,7 +119,7 @@ impl Keygen {
         Ok(state)
     }
 
-    pub fn get_state(&self) -> &R{
+    pub fn get_state(&self) -> &R {
         &self.round
     }
 

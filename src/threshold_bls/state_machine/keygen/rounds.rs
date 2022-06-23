@@ -47,9 +47,9 @@ pub struct Round1 {
     comm: party_i::KeyGenComm,
     decom: party_i::KeyGenDecom,
 
-    party_i: u16,
-    t: u16,
-    n: u16,
+    pub(crate) party_i: u16,
+    pub(crate) t: u16,
+    pub(crate) n: u16,
 }
 
 impl Round1 {
@@ -90,9 +90,9 @@ pub struct Round2 {
     received_comm: Vec<party_i::KeyGenComm>,
     decom: party_i::KeyGenDecom,
 
-    party_i: u16,
-    t: u16,
-    n: u16,
+    pub(crate) party_i: u16,
+    pub(crate) t: u16,
+    pub(crate) n: u16,
 }
 
 impl Round2 {
@@ -166,9 +166,9 @@ pub struct Round3 {
 
     own_share: party_i::KeyShare,
 
-    party_i: u16,
-    t: u16,
-    n: u16,
+    pub(crate) party_i: u16,
+    pub(crate) t: u16,
+    pub(crate) n: u16,
 }
 
 impl Round3 {
@@ -238,9 +238,9 @@ pub struct Round4 {
     shared_keys: party_i::SharedKey,
     own_dlog_proof: KeyProof,
 
-    party_i: u16,
-    t: u16,
-    n: u16,
+    pub(crate) party_i: u16,
+    pub(crate) t: u16,
+    pub(crate) n: u16,
 }
 
 impl Round4 {
